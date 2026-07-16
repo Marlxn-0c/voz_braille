@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Braille Voz - Cuentos que se escuchan, historias que se sienten</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & ReactDOM 18 CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone para compilar JSX en tiempo de ejecución -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Animación de entrada suave */
+    .animate-fadeIn {
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="m-0 p-0 overflow-x-hidden">
+  
+  <!-- Contenedor principal donde se montará React -->
+  <div id="root"></div>
+
+  <!-- Script que contiene el código de la aplicación React compile por Babel -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ==========================================
+    // CONSTANTES Y ALFABETO BRAILLE
+    // ==========================================
+    const BRAILLE_ALPHABET = {
+      a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5],
+      f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],
+      k: [1, 3], l: [1, 2, 3], m: [1, 3, 4], n: [1, 3, 4, 5], o: [1, 3, 5],
+      p: [1, 2, 3, 4], q: [1, 2, 3, 4, 5], r: [1, 2, 3, 5], s: [2, 3, 4], t: [2, 3, 4, 5],
+      u: [1, 3, 6], v: [1, 2, 3, 6], w: [2, 4, 5, 6], x: [1, 3, 4, 6], y: [1, 3, 4, 5, 6], z: [1, 3, 5, 6]
+    };
+
+    const INITIAL_STORIES = [
+      {
+        id: 1,
+        title: "El Concierto del Bosque",
+        summary: "Acompaña a Mateo a descubrir que los árboles y el viento tocan la melodía más hermosa del mundo.",
+        content: "Mateo cerró los ojos y respiró hondo. El aire olía a tierra mojada y a pino fresco. A su alrededor, el bosque no estaba en silencio; estaba lleno de música. Bajo sus pies, las hojas secas crujían suavemente con un sonido rítmico, como maracas de la naturaleza. De repente, un silbido suave recorrió las copas de los árboles: era el viento jugando a ser un flautista. Mateo extendió sus manos y tocó la corteza de un viejo roble; era áspera, rugosa y cálida, llena de surcos que contaban historias de cien años. En ese momento, un coro de pájaros comenzó a cantar desde lo alto. Mateo sonrió, entendiendo que no necesitaba ver el bosque para sentir su maravilloso concierto.",
+        sensoryFocus: "Oído y Tacto"
+      },
+      {
+        id: 2,
+        title: "El Aroma Perdido",
+        summary: "La perrita guía Luna ayuda a resolver el misterio de las flores de vainilla en el jardín.",
+        content: "Luna, la labradora de pelaje suave como el algodón, dio tres golpecitos con su nariz húmeda en la mano de Sofía. Era la señal para iniciar la aventura matutina. Hoy el jardín olía diferente. Caminaron sobre el sendero de piedras redondas y lisas que se sentían frescas bajo los pies descalzos. Al acercarse a las flores, un aroma dulce, cálido y reconfortante inundó el aire: ¡era vainilla! Sofía extendió sus dedos y acarició los pétalos aterciopelados de una gran flor. Al tocarlos, un polvillo fino y aromático quedó en sus dedos, oliendo a galletas recién horneadas. Luna soltó un alegre ladrido y movió la cola rítmicamente contra el pasto mullido. Juntas habían descubierto que la felicidad tiene aroma a vainilla y textura de pétalo.",
+        sensoryFocus: "Olfato y Tacto"
+      },
+      {
+        id: 3,
+        title: "Estrellas de Mar",
+        summary: "Una aventura a la orilla del océano sintiendo la arena tibia, la brisa salada y el vaivén de las olas.",
+        content: "El sonido del mar era un susurro constante que iba y venía: 'Shhh... shhh...'. Cada ola que llegaba a la orilla dejaba una espuma fresca que hacía cosquillas en los tobillos de Tomás. La arena bajo sus pies estaba tibia por el sol del mediodía y se escurría suavemente entre sus dedos como agua seca. Tomás se agachó y enterró las manos. Encontró algo pequeño, liso y con forma de estrella. Tenía una textura ligeramente rugosa en los bordes pero un centro suave. Al acercarla a su oído, no solo escuchó el viento marino, sino que sintió la brisa salada acariciándole la cara. El océano entero estaba hablándole con su voz de espuma y caricias de arena.",
+        sensoryFocus: "Tacto y Sonido"
+      }
+    ];
+
+    // Reproductor de Tonos sintetizados con Web Audio API
+    const playTone = (frequency, duration = 0.3, type = 'sine') => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+        
+        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.log("AudioContext no iniciado o no soportado.");
+      }
+    };
+
+    // Componente de Iconos SVG interno (Sustituto ultrarrápido y compatible con CDN de lucide)
+    function Icon({ name, size = 18, className = "" }) {
+      const icons = {
+        Volume1: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>,
+        Volume2: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>,
+        VolumeX: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>,
+        BookOpen: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>,
+        Gamepad2: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="3"></rect></svg>,
+        Sparkles: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"></path></svg>,
+        ChevronRight: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>,
+        Play: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>,
+        Pause: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>,
+        RotateCcw: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0-.57-8.38l5.67-5.67"></path></svg>,
+        ArrowLeft: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>,
+        Check: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+        Award: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>,
+        Eye: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>,
+        EyeOff: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>,
+        Search: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
+        Plus: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+        List: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+      };
+      return icons[name] || null;
+    }
+
+    // ==========================================
+    // COMPONENTE PRINCIPAL (APP)
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('home');
+      const [voiceOverEnabled, setVoiceOverEnabled] = useState(true);
+      const [highContrast, setHighContrast] = useState(false);
+      const [speechRate, setSpeechRate] = useState(1);
+      const [gameScore, setGameScore] = useState(0);
+      const [stories, setStories] = useState(INITIAL_STORIES);
+
+      const speechUtteranceRef = useRef(null);
+
+      useEffect(() => {
+        speak("Bienvenido a Braille Voz. Toca cualquier elemento para escucharlo.");
+      }, []);
+
+      const speak = (text) => {
+        if (!voiceOverEnabled) return;
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'es-MX';
+          utterance.rate = speechRate;
+          speechUtteranceRef.current = utterance;
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.error("Error en la síntesis de voz:", e);
+        }
+      };
+
+      const menuItems = [
+        { id: 'home', label: 'Inicio', icon: <Icon name="Volume1" size={18} /> },
+        { id: 'braille', label: 'Abecedario', icon: <Icon name="BookOpen" size={18} /> },
+        { id: 'cuentos', label: 'Cuentos', icon: <Icon name="Sparkles" size={18} /> },
+        { id: 'juegos', label: 'Juegos', icon: <Icon name="Gamepad2" size={18} /> },
+      ];
+
+      return (
+        <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 pb-20 md:pb-0 ${
+          highContrast ? 'bg-black text-yellow-300' : 'bg-[#E6D8CB] text-[#2F3559]'
+        }`}>
+          
+          {/* HEADER COMPACTADO */}
+          <header className={`border-b shadow-sm ${
+            highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-[#2F3559] text-[#E6D8CB] border-[#9A5071]/20'
+          }`}>
+            <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
+              
+              {/* Logo */}
+              <div 
+                className="flex items-center gap-2.5 cursor-pointer select-none"
+                onClick={() => { setActiveTab('home'); speak("Volver al Inicio"); }}
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/10 rounded-xl border border-dashed border-[#F1BBBB]/40 flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="logotipo de braille voz.jpeg" 
+                    alt="Logo" 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      const fallback = e.target.nextSibling;
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
+                  />
+                  <div className="hidden text-[10px] text-[#E6D8CB] font-bold">🐾</div>
+                </div>
+                <div>
+                  <h1 className="text-lg md:text-xl font-black leading-none flex gap-0.5">
+                    <span className="text-[#E6D8CB]">braille</span>
+                    <span className="text-[#F1BBBB]">voz</span>
+                  </h1>
+                  <p className="hidden md:block text-[10px] text-[#E6D8CB]/80 italic font-medium mt-0.5">
+                    "Cuentos que se escuchan, historias que se sienten"
+                  </p>
+                </div>
+              </div>
+
+              {/* Accesibilidad rápida (Header) */}
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    const newVal = !voiceOverEnabled;
+                    setVoiceOverEnabled(newVal);
+                    if (newVal) {
+                      setTimeout(() => speak("Voz activada."), 200);
+                    } else {
+                      window.speechSynthesis.cancel();
+                    }
+                  }}
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    voiceOverEnabled ? 'bg-[#9A5071] text-white shadow-sm' : 'bg-[#E6D8CB]/10 text-[#E6D8CB] border border-[#E6D8CB]/20'
+                  }`}
+                  title="Activar/Silenciar voz"
+                  onMouseEnter={() => speak("Alternar voz")}
+                >
+                  {voiceOverEnabled ? <Icon name="Volume2" size={18} /> : <Icon name="VolumeX" size={18} />}
+                </button>
+
+                {/* Selector de velocidad */}
+                {voiceOverEnabled && (
+                  <button 
+                    onClick={() => {
+                      const rates = [1, 1.3, 0.8];
+                      const nextIndex = (rates.indexOf(speechRate) + 1) % rates.length;
+                      const nextRate = rates[nextIndex];
+                      setSpeechRate(nextRate);
+                      speak(nextRate === 1 ? "Velocidad normal" : nextRate === 1.3 ? "Velocidad rápida" : "Velocidad lenta");
+                    }}
+                    className="text-[10px] md:text-xs font-bold px-2.5 py-2 bg-black/15 text-[#E6D8CB] rounded-full hover:bg-black/30"
+                  >
+                    {speechRate === 1 ? 'Voz: Norm' : speechRate === 1.3 ? 'Voz: Rápida' : 'Voz: Lenta'}
+                  </button>
+                )}
+
+                <button 
+                  onClick={() => {
+                    const nextVal = !highContrast;
+                    setHighContrast(nextVal);
+                    speak(nextVal ? "Contraste alto." : "Contraste normal.");
+                  }}
+                  className={`p-2 rounded-full transition-all duration-200 ${
+                    highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071]/20 text-[#E6D8CB]'
+                  }`}
+                  onMouseEnter={() => speak("Cambiar contraste")}
+                >
+                  {highContrast ? <Icon name="Eye" size={18} /> : <Icon name="EyeOff" size={18} />}
+                </button>
+              </div>
+
+            </div>
+          </header>
+
+          {/* MENÚ DE ESCRITORIO (Solo visible en Laptop) */}
+          <nav className={`hidden md:block sticky top-0 z-10 shadow-sm ${
+            highContrast ? 'bg-zinc-800 text-yellow-300 border-b border-yellow-300' : 'bg-[#9A5071] text-[#E6D8CB]'
+          }`}>
+            <div className="max-w-6xl mx-auto px-4 flex justify-around">
+              {menuItems.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    speak(`Sección ${tab.label}`);
+                  }}
+                  onMouseEnter={() => speak(tab.label)}
+                  className={`flex items-center gap-2 py-3 px-6 text-sm font-bold border-b-4 transition-all duration-200 ${
+                    activeTab === tab.id 
+                      ? (highContrast ? 'border-yellow-300 bg-black text-yellow-300' : 'border-[#F1BBBB] bg-[#2F3559] text-[#E6D8CB]')
+                      : 'border-transparent hover:bg-black/10'
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* CONTENIDO PRINCIPAL - LIMITADO PARA EVITAR PANTALLAS LARGAS */}
+          <main className="flex-grow max-w-5xl mx-auto w-full px-3 py-4 md:py-6 overflow-y-auto">
+            {activeTab === 'home' && (
+              <HomeScreen setActiveTab={setActiveTab} speak={speak} highContrast={highContrast} />
+            )}
+            
+            {activeTab === 'braille' && (
+              <BrailleScreen speak={speak} highContrast={highContrast} />
+            )}
+            
+            {activeTab === 'cuentos' && (
+              <StoriesScreen 
+                speak={speak} 
+                stories={stories} 
+                setStories={setStories} 
+                highContrast={highContrast} 
+              />
+            )}
+            
+            {activeTab === 'juegos' && (
+              <GamesScreen 
+                speak={speak} 
+                highContrast={highContrast} 
+                gameScore={gameScore} 
+                setGameScore={setGameScore} 
+              />
+            )}
+          </main>
+
+          {/* MENÚ MÓVIL FIJO (Estilo App Nativa) */}
+          <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-30 border-t flex items-center justify-around py-1 px-2 shadow-lg backdrop-blur-md ${
+            highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-[#2F3559] text-[#E6D8CB] border-[#9A5071]/20'
+          }`}>
+            {menuItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  speak(item.label);
+                }}
+                className={`flex flex-col items-center justify-center p-2 rounded-xl w-16 transition-all ${
+                  activeTab === item.id 
+                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white')
+                    : 'opacity-70'
+                }`}
+              >
+                <div className="mb-0.5">{item.icon}</div>
+                <span className="text-[10px] font-bold leading-none">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 1. PANTALLA: INICIO (HomeScreen)
+    // ==========================================
+    function HomeScreen({ setActiveTab, speak, highContrast }) {
+      return (
+        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
+          
+          <div className={`p-5 md:p-6 rounded-2xl shadow-md border text-center transition-all ${
+            highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-[#E394A7]/20 text-[#2F3559]'
+          }`}>
+            <div className="inline-flex p-2.5 bg-[#E6D8CB]/50 rounded-full mb-3">
+              <span className="text-3xl md:text-4xl" role="img" aria-label="Perro Labrador">🐕</span>
+            </div>
+            <h2 className="text-xl md:text-2xl font-extrabold mb-2">¡Hola, te damos la bienvenida!</h2>
+            <p className="text-xs md:text-sm leading-relaxed mb-4 max-w-lg mx-auto opacity-90">
+              Explora de forma táctil el alfabeto Braille, escucha cuentos interactivos o entrena tu memoria auditiva con nuestros minijuegos rápidos.
+            </p>
+            
+            <button
+              onClick={() => speak("Braille Voz es un espacio seguro para aprender tocando y escuchando.")}
+              className={`px-6 py-2.5 rounded-full font-bold text-sm inline-flex items-center gap-2 transition-transform hover:scale-102 ${
+                highContrast ? 'bg-yellow-300 text-black' : 'bg-[#2F3559] text-[#E6D8CB] hover:bg-[#2F3559]/90'
+              }`}
+            >
+              <Icon name="Volume2" size={16} />
+              <span>Escuchar Introducción</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { id: 'braille', label: 'Abecedario', desc: 'Aprende y traduce letras.', icon: <Icon name="BookOpen" size={20} />, bg: 'bg-[#F1BBBB]/20' },
+              { id: 'cuentos', label: 'Cuentos', desc: 'Historias llenas de texturas.', icon: <Icon name="Sparkles" size={20} />, bg: 'bg-[#E394A7]/20' },
+              { id: 'juegos', label: 'Juegos', desc: 'Desafíos auditivos interactivos.', icon: <Icon name="Gamepad2" size={20} />, bg: 'bg-[#9A5071]/20' }
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); speak(`Sección ${item.label}`); }}
+                className={`p-3.5 rounded-xl border flex items-center gap-3 text-left transition-transform hover:scale-[1.01] ${
+                  highContrast ? 'bg-black border-yellow-300' : 'bg-white hover:border-[#9A5071]/50'
+                }`}
+              >
+                <div className={`p-2.5 rounded-lg ${highContrast ? 'bg-yellow-300 text-black' : `${item.bg} text-[#2F3559]`}`}>
+                  {item.icon}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold block">{item.label}</h3>
+                  <p className="text-[10px] opacity-70 block">{item.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 2. PANTALLA: ABECEDARIO (BrailleScreen)
+    // ==========================================
+    function BrailleScreen({ speak, highContrast }) {
+      const [subTab, setSubTab] = useState('explorar');
+      const [customCell, setCustomCell] = useState([]);
+      const [searchText, setSearchText] = useState('');
+
+      const toggleDot = (dot) => {
+        let newCell = customCell.includes(dot) 
+          ? customCell.filter(d => d !== dot)
+          : [...customCell, dot].sort();
+        
+        setCustomCell(newCell);
+
+        const matched = Object.keys(BRAILLE_ALPHABET).find(letter => {
+          const dots = BRAILLE_ALPHABET[letter];
+          return dots.length === newCell.length && dots.every(v => newCell.includes(v));
+        });
+
+        if (matched) {
+          playTone(440, 0.15);
+          speak(`Formaste la letra ${matched.toUpperCase()}`);
+        } else {
+          playTone(330, 0.1);
+        }
+      };
+
+      const getCustomLetter = () => {
+        return Object.keys(BRAILLE_ALPHABET).find(letter => {
+          const dots = BRAILLE_ALPHABET[letter];
+          return dots.length === customCell.length && dots.every(v => customCell.includes(v));
+        }) || null;
+      };
+
+      return (
+        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
+          
+          <div className="flex bg-black/5 p-1 rounded-xl">
+            {[
+              { id: 'explorar', label: 'Explorar' },
+              { id: 'constructor', label: 'Constructor' },
+              { id: 'traductor', label: 'Traductor' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => { setSubTab(tab.id); speak(`Herramienta ${tab.label}`); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  subTab === tab.id 
+                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
+                    : 'opacity-75'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {subTab === 'explorar' && (
+            <div className={`p-4 rounded-xl border ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
+            }`}>
+              <p className="text-[11px] mb-3 opacity-85 text-center">Pulsa cualquier letra para escucharla e identificar sus puntos.</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[50vh] overflow-y-auto pr-1">
+                {Object.entries(BRAILLE_ALPHABET).map(([letter, dots]) => (
+                  <button
+                    key={letter}
+                    onClick={() => {
+                      playTone(320 + (letter.charCodeAt(0) * 2), 0.15);
+                      speak(`Letra ${letter.toUpperCase()}. Puntos: ${dots.join(', ')}`);
+                    }}
+                    className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all ${
+                      highContrast ? 'bg-zinc-955 border-yellow-300/30' : 'bg-gray-50/70 border-gray-100 hover:border-[#9A5071]'
+                    }`}
+                  >
+                    <span className="text-base font-extrabold mb-1">{letter.toUpperCase()}</span>
+                    <div className="grid grid-cols-2 gap-0.5 bg-[#E6D8CB]/20 p-1 rounded">
+                      {[1, 4, 2, 5, 3, 6].map(d => (
+                        <div 
+                          key={d} 
+                          className={`w-2 h-2 rounded-full ${
+                            dots.includes(d) ? (highContrast ? 'bg-yellow-300' : 'bg-[#9A5071]') : 'bg-gray-300/80'
+                          }`} 
+                        />
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {subTab === 'constructor' && (
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4 ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
+            }`}>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-sm font-extrabold flex items-center gap-1.5 justify-center sm:justify-start">
+                  <Icon name="Sparkles" size={16} className="text-[#9A5071]" /> Constructor Braille
+                </h3>
+                <p className="text-[11px] opacity-80 mt-1 max-w-sm">Pulsa los puntos circulares y descubre qué letra formas.</p>
+                
+                <div className="mt-4 flex items-center justify-center sm:justify-start gap-2">
+                  <span className="text-xs uppercase font-extrabold opacity-75">Letra encontrada:</span>
+                  <span className="text-2xl font-black text-[#9A5071] bg-[#E6D8CB]/30 px-3 py-1 rounded-lg">
+                    {getCustomLetter() ? getCustomLetter().toUpperCase() : '?'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => { setCustomCell([]); speak("Limpiado"); }}
+                  className="mt-4 px-4 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider block mx-auto sm:mx-0"
+                >
+                  Reiniciar Puntos
+                </button>
+              </div>
+
+              <div className="p-3 bg-[#E6D8CB]/20 rounded-xl">
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 4, 2, 5, 3, 6].map(num => (
+                    <button
+                      key={num}
+                      onClick={() => toggleDot(num)}
+                      className={`w-12 h-12 rounded-full font-bold text-sm flex items-center justify-center transition-all shadow-sm ${
+                        customCell.includes(num)
+                          ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white')
+                          : 'bg-white border border-gray-300'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {subTab === 'traductor' && (
+            <div className={`p-4 rounded-xl border space-y-3 ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <Icon name="Search" size={16} className="text-[#9A5071]" />
+                <h3 className="text-sm font-extrabold">Traductor Instantáneo</h3>
+              </div>
+              
+              <input 
+                type="text" 
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Escribe aquí..."
+                className={`w-full p-2.5 rounded-lg font-bold text-sm focus:outline-none focus:ring-1 ${
+                  highContrast 
+                    ? 'bg-zinc-900 border border-yellow-300 text-yellow-300 focus:ring-yellow-300' 
+                    : 'bg-[#E6D8CB]/20 border border-[#E394A7]/20 focus:ring-[#9A5071]'
+                }`}
+              />
+
+              {searchText && (
+                <div className="p-3 bg-[#E6D8CB]/10 rounded-lg max-h-[30vh] overflow-y-auto">
+                  <div className="flex flex-wrap gap-2">
+                    {searchText.toLowerCase().split('').map((char, index) => {
+                      const activeDots = BRAILLE_ALPHABET[char] || [];
+                      if (!BRAILLE_ALPHABET[char] && char !== ' ') return null;
+                      return (
+                        <div key={index} className="flex flex-col items-center p-2 bg-white rounded-lg border text-[10px] min-w-[50px] shadow-sm">
+                          <span className="font-bold mb-1 text-xs">{char === ' ' ? 'Esp' : char.toUpperCase()}</span>
+                          <div className="grid grid-cols-2 gap-0.5 bg-[#E6D8CB]/15 p-1 rounded">
+                            {[1, 4, 2, 5, 3, 6].map(dot => (
+                              <div 
+                                key={dot}
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  activeDots.includes(dot) ? 'bg-[#9A5071]' : 'bg-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 3. PANTALLA: CUENTOS (StoriesScreen)
+    // ==========================================
+    function StoriesScreen({ speak, stories, setStories, highContrast }) {
+      const [subTab, setSubTab] = useState('biblioteca');
+      const [selectedStory, setSelectedStory] = useState(null);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [aiTopic, setAiTopic] = useState('');
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
+
+      const playStory = (story) => {
+        setSelectedStory(story);
+        setIsPlaying(true);
+        speak(`Narración de: ${story.title}. ... ${story.content}`);
+      };
+
+      const pauseStory = () => {
+        window.speechSynthesis.pause();
+        setIsPlaying(false);
+        speak("Pausado");
+      };
+
+      const resumeStory = () => {
+        window.speechSynthesis.resume();
+        setIsPlaying(true);
+      };
+
+      const stopStory = () => {
+        window.speechSynthesis.cancel();
+        setIsPlaying(false);
+        setSelectedStory(null);
+      };
+
+      const generateAIStory = async () => {
+        if (!aiTopic.trim()) {
+          speak("Indica un tema para el cuento.");
+          return;
+        }
+
+        setIsGenerating(true);
+        setErrorMsg('');
+        speak("Creando tu cuento personalizado con inteligencia artificial.");
+
+        const apiKey = ""; 
+        const systemPrompt = "Eres un escritor especialista en literatura infantil adaptada para niños con discapacidad visual. Generas cuentos muy sensoriales y cortos de 3 párrafos cortos en español. Concéntrate en describir sonidos, olores y texturas. Devuelve únicamente el cuento.";
+        const userPrompt = `Escribe un cuento infantil muy descriptivo y sensorial sobre: "${aiTopic}". El protagonista debe ser un perrito guía Golden Retriever llamado "Braillito".`;
+
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+              })
+            }
+          );
+
+          if (!response.ok) throw new Error("Error de conexión.");
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (!text) throw new Error("Respuesta de IA vacía.");
+
+          const newStory = {
+            id: Date.now(),
+            title: `Cuento: ${aiTopic.substring(0, 15)}`,
+            summary: `Creado por IA sobre ${aiTopic}.`,
+            content: text,
+            sensoryFocus: "Sensorial (IA)"
+          };
+
+          setStories(prev => [newStory, ...prev]);
+          setSelectedStory(newStory);
+          setIsGenerating(false);
+          setAiTopic('');
+          setSubTab('biblioteca');
+          speak(`¡Tu cuento ha sido creado! Se titula: ${newStory.title}. ¿Quieres escucharlo?`);
+        } catch (err) {
+          setIsGenerating(false);
+          setErrorMsg('No pudimos conectar con el creador en este momento.');
+          speak("Ocurrió un error al conectar.");
+        }
+      };
+
+      return (
+        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
+          
+          {!selectedStory && (
+            <div className="flex bg-black/5 p-1 rounded-xl">
+              <button
+                onClick={() => { setSubTab('biblioteca'); speak("Biblioteca de cuentos"); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                  subTab === 'biblioteca' 
+                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
+                    : 'opacity-75'
+                }`}
+              >
+                <Icon name="List" size={14} /> Biblioteca
+              </button>
+              <button
+                onClick={() => { setSubTab('creador'); speak("Creador inteligente de cuentos"); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                  subTab === 'creador' 
+                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
+                    : 'opacity-75'
+                }`}
+              >
+                <Icon name="Plus" size={14} /> Creador IA
+              </button>
+            </div>
+          )}
+
+          {selectedStory ? (
+            <div className={`p-4 rounded-xl border space-y-4 ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10 shadow-md'
+            }`}>
+              <div className="flex items-center justify-between border-b pb-2">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-[#9A5071]">{selectedStory.sensoryFocus}</span>
+                  <h3 className="text-lg font-black">{selectedStory.title}</h3>
+                </div>
+                <button 
+                  onClick={stopStory}
+                  className="p-1.5 border rounded-full hover:bg-gray-100"
+                >
+                  <Icon name="ArrowLeft" size={16} />
+                </button>
+              </div>
+
+              <div className="max-h-[35vh] overflow-y-auto pr-1 text-sm md:text-base leading-relaxed whitespace-pre-line bg-[#E6D8CB]/10 p-3 rounded-lg border">
+                "{selectedStory.content}"
+              </div>
+
+              <div className="flex gap-2 justify-center">
+                {isPlaying ? (
+                  <button
+                    onClick={pauseStory}
+                    className="px-4 py-2 bg-[#9A5071] text-white text-xs rounded-full flex items-center gap-1.5 font-bold"
+                  >
+                    <Icon name="Pause" size={14} /> Pausar
+                  </button>
+                ) : (
+                  <button
+                    onClick={resumeStory}
+                    className="px-4 py-2 bg-[#2F3559] text-white text-xs rounded-full flex items-center gap-1.5 font-bold"
+                  >
+                    <Icon name="Play" size={14} /> Reanudar
+                  </button>
+                )}
+                <button
+                  onClick={() => playStory(selectedStory)}
+                  className="px-4 py-2 border text-xs rounded-full flex items-center gap-1.5 font-bold"
+                >
+                  <Icon name="RotateCcw" size={14} /> Reiniciar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {subTab === 'biblioteca' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+                  {stories.map(story => (
+                    <div
+                      key={story.id}
+                      className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                        highContrast ? 'bg-zinc-950 border-yellow-300' : 'bg-white border-gray-100'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-[9px] font-bold text-[#9A5071] uppercase bg-[#E6D8CB]/30 px-1.5 py-0.5 rounded">
+                          {story.sensoryFocus}
+                        </span>
+                        <h4 className="text-sm font-extrabold mt-2 mb-1">{story.title}</h4>
+                        <p className="text-[11px] opacity-80 line-clamp-2 leading-relaxed mb-3">{story.summary}</p>
+                      </div>
+                      <button
+                        onClick={() => playStory(story)}
+                        className="w-full py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 bg-[#2F3559] text-white"
+                      >
+                        <Icon name="Play" size={12} /> Escuchar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {subTab === 'creador' && (
+                <div className={`p-4 rounded-xl border space-y-3 ${
+                  highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10 shadow-sm'
+                }`}>
+                  <h3 className="text-sm font-extrabold">Crea una historia nueva</h3>
+                  <p className="text-[11px] opacity-80">Escribe sobre qué quieres el cuento (ej: "un gato espacial", "un río tibio").</p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input 
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e) => setAiTopic(e.target.value)}
+                      placeholder="Escribe una idea..."
+                      className={`flex-1 p-2.5 rounded-lg text-xs focus:outline-none focus:ring-1 ${
+                        highContrast 
+                          ? 'bg-zinc-900 border border-yellow-300 text-yellow-300' 
+                          : 'bg-[#E6D8CB]/20 border border-[#E394A7]/20 text-[#2F3559]'
+                      }`}
+                    />
+                    <button
+                      onClick={generateAIStory}
+                      disabled={isGenerating}
+                      className={`px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${
+                        highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white hover:bg-[#9A5071]/90'
+                      }`}
+                    >
+                      {isGenerating ? "Creando..." : "Generar"}
+                    </button>
+                  </div>
+                  {errorMsg && <p className="text-red-500 text-[10px] font-bold">{errorMsg}</p>}
+                </div>
+              )}
+            </>
+          )}
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 4. PANTALLA: JUEGOS DE OÍDO (GamesScreen)
+    // ==========================================
+    function GamesScreen({ speak, highContrast, gameScore, setGameScore }) {
+      const [activeGame, setActiveGame] = useState(null);
+
+      // Juego 1: Adivina el Braille
+      const [quizLetter, setQuizLetter] = useState('a');
+      const [quizOptions, setQuizOptions] = useState([]);
+      const [quizFeedback, setQuizFeedback] = useState(null);
+
+      // Juego 2: Memorama de sonidos
+      const [soundCards, setSoundCards] = useState([]);
+      const [selectedCards, setSelectedCards] = useState([]);
+      const [matchedCards, setMatchedCards] = useState([]);
+      const [isChecking, setIsChecking] = useState(false);
+
+      // Juego 3: Simon Says auditivo
+      const [simonSeq, setSimonSeq] = useState([]);
+      const [userSeq, setUserSeq] = useState([]);
+      const [isPlayingSeq, setIsPlayingSeq] = useState(false);
+
+      // --- LOGICA JUEGO 1 ---
+      const generateQuiz = () => {
+        const letters = Object.keys(BRAILLE_ALPHABET);
+        const correct = letters[Math.floor(Math.random() * letters.length)];
+        setQuizLetter(correct);
+
+        let options = [correct];
+        while (options.length < 4) {
+          const rLetter = letters[Math.floor(Math.random() * letters.length)];
+          if (!options.includes(rLetter)) options.push(rLetter);
+        }
+        options.sort(() => Math.random() - 0.5);
+        setQuizOptions(options);
+        setQuizFeedback(null);
+      };
+
+      const handleQuizAnswer = (letter) => {
+        if (quizFeedback) return;
+        const correct = letter === quizLetter;
+        if (correct) {
+          setGameScore(prev => prev + 10);
+          playTone(523.25, 0.15);
+          setTimeout(() => playTone(659.25, 0.3), 150);
+          setQuizFeedback({ success: true, msg: `¡Acierto! Es la letra "${letter.toUpperCase()}"` });
+          speak(`¡Excelente! Correcto, es la letra ${letter.toUpperCase()}`);
+        } else {
+          playTone(220, 0.4, 'sawtooth');
+          setQuizFeedback({ success: false, msg: `Incorrecto. Era la letra "${quizLetter.toUpperCase()}"` });
+          speak(`Incorrecto. Era la letra ${quizLetter.toUpperCase()}`);
+        }
+      };
+
+      // --- LOGICA JUEGO 2 ---
+      const initMemoryGame = () => {
+        const cardData = [
+          { id: 1, soundId: 1, label: "Campana" },
+          { id: 2, soundId: 1, label: "Campana" },
+          { id: 3, soundId: 2, label: "Flauta" },
+          { id: 4, soundId: 2, label: "Flauta" },
+          { id: 5, soundId: 3, label: "Arpa" },
+          { id: 6, soundId: 3, label: "Arpa" },
+          { id: 7, soundId: 4, label: "Tambor" },
+          { id: 8, soundId: 4, label: "Tambor" }
+        ].sort(() => Math.random() - 0.5);
+
+        setSoundCards(cardData);
+        setSelectedCards([]);
+        setMatchedCards([]);
+        setIsChecking(false);
+        speak("Memorama iniciado. Encuentra las parejas de sonidos.");
+      };
+
+      const playSoundCard = (soundId) => {
+        const frequencies = { 1: 261.63, 2: 329.63, 3: 392.00, 4: 523.25 };
+        playTone(frequencies[soundId] || 440, 0.4, 'triangle');
+      };
+
+      const handleCardClick = (idx) => {
+        if (isChecking || selectedCards.includes(idx) || matchedCards.includes(idx)) return;
+        
+        const card = soundCards[idx];
+        playSoundCard(card.soundId);
+        speak(card.label);
+
+        const updated = [...selectedCards, idx];
+        setSelectedCards(updated);
+
+        if (updated.length === 2) {
+          setIsChecking(true);
+          const [first, second] = updated;
+          if (soundCards[first].soundId === soundCards[second].soundId) {
+            setTimeout(() => {
+              setMatchedCards(p => [...p, first, second]);
+              setSelectedCards([]);
+              setIsChecking(false);
+              setGameScore(p => p + 15);
+              playTone(600, 0.2);
+              speak("¡Pareja encontrada!");
+            }, 600);
+          } else {
+            setTimeout(() => {
+              setSelectedCards([]);
+              setIsChecking(false);
+              playTone(180, 0.3);
+            }, 1200);
+          }
+        }
+      };
+
+      // --- LOGICA JUEGO 3 ---
+      const initSimon = () => {
+        const initial = [Math.floor(Math.random() * 3) + 1];
+        setSimonSeq(initial);
+        setUserSeq([]);
+        playSimonSequence(initial);
+        speak("Escucha la secuencia y repítela.");
+      };
+
+      const playSimonSound = (id) => {
+        const freqs = { 1: 300, 2: 400, 3: 500 };
+        playTone(freqs[id], 0.4, 'triangle');
+      };
+
+      const playSimonSequence = async (sequence) => {
+        setIsPlayingSeq(true);
+        for (let i = 0; i < sequence.length; i++) {
+          await new Promise(r => setTimeout(r, 600));
+          playSimonSound(sequence[i]);
+        }
+        setIsPlayingSeq(false);
+      };
+
+      const handleSimonPress = (id) => {
+        if (isPlayingSeq) return;
+        playSimonSound(id);
+        const updated = [...userSeq, id];
+        setUserSeq(updated);
+
+        const step = updated.length - 1;
+        if (updated[step] !== simonSeq[step]) {
+          playTone(150, 0.5, 'sawtooth');
+          speak("Fallo. Intenta de nuevo.");
+          setUserSeq([]);
+          setSimonSeq([]);
+          return;
+        }
+
+        if (updated.length === simonSeq.length) {
+          setGameScore(p => p + 20);
+          speak("¡Correcto!");
+          setTimeout(() => {
+            const next = [...simonSeq, Math.floor(Math.random() * 3) + 1];
+            setSimonSeq(next);
+            setUserSeq([]);
+            playSimonSequence(next);
+          }, 1000);
+        }
+      };
+
+      return (
+        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
+          
+          <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
+            highContrast ? 'bg-black border-yellow-300' : 'bg-[#E394A7]/10 border-[#E394A7]/20'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              <Icon name="Award" size={16} className="text-[#9A5071]" />
+              <span>PUNTOS:</span>
+            </div>
+            <span className="text-lg font-black text-[#9A5071]">{gameScore} Pts</span>
+          </div>
+
+          {!activeGame ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { id: 'quiz', label: '¿Qué letra es?', desc: 'Adivina la letra por sus puntos.', play: generateQuiz },
+                { id: 'memory', label: 'Memorama Auditivo', desc: 'Une las parejas de timbres.', play: initMemoryGame },
+                { id: 'simon', label: 'Secuencias', desc: 'Repite la melodía táctil.', play: initSimon }
+              ].map(game => (
+                <button
+                  key={game.id}
+                  onClick={() => { setActiveGame(game.id); game.play(); }}
+                  className={`p-4 rounded-xl border text-left hover:border-[#9A5071]/50 transition-all ${
+                    highContrast ? 'bg-black border-yellow-300' : 'bg-white'
+                  }`}
+                >
+                  <h3 className="font-extrabold text-sm mb-1">{game.label}</h3>
+                  <p className="text-[10px] opacity-75">{game.desc}</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={`p-4 rounded-xl border ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10 shadow-sm'
+            }`}>
+              <div className="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 className="text-xs font-black uppercase tracking-wide">
+                  {activeGame === 'quiz' && "Adivina el Braille"}
+                  {activeGame === 'memory' && "Memorama"}
+                  {activeGame === 'simon' && "Secuencias"}
+                </h3>
+                <button 
+                  onClick={() => setActiveGame(null)}
+                  className="px-2.5 py-1 border rounded-lg text-[10px] font-bold"
+                >
+                  Cerrar Juego
+                </button>
+              </div>
+
+              {/* JUEGO 1: QUIZ */}
+              {activeGame === 'quiz' && (
+                <div className="space-y-4 text-center max-w-xs mx-auto">
+                  <div className="inline-grid grid-cols-2 gap-2 bg-[#E6D8CB]/20 p-3 rounded-xl">
+                    {[1, 4, 2, 5, 3, 6].map(num => (
+                      <div 
+                        key={num} 
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          (BRAILLE_ALPHABET[quizLetter] || []).includes(num)
+                            ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white')
+                            : 'bg-gray-200'
+                        }`}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {quizOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleQuizAnswer(opt)}
+                        className="py-2 bg-[#2F3559] text-white rounded-lg text-sm font-bold hover:scale-102"
+                      >
+                        {opt.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+
+                  {quizFeedback && (
+                    <div className="p-2 bg-gray-50/80 rounded-lg text-[11px] space-y-1.5">
+                      <p className="font-bold text-[#9A5071]">{quizFeedback.msg}</p>
+                      <button 
+                        onClick={generateQuiz} 
+                        className="px-3 py-1 bg-[#9A5071] text-white rounded-md text-[10px]"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* JUEGO 2: MEMORAMA */}
+              {activeGame === 'memory' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
+                    {soundCards.map((card, idx) => {
+                      const isSelected = selectedCards.includes(idx);
+                      const isMatched = matchedCards.includes(idx);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleCardClick(idx)}
+                          className={`h-14 rounded-xl flex items-center justify-center border text-sm font-bold ${
+                            isMatched 
+                              ? 'bg-green-100 border-green-300 opacity-60'
+                              : isSelected
+                                ? 'bg-[#9A5071] text-white border-transparent'
+                                : 'bg-gray-100 border-gray-200'
+                          }`}
+                        >
+                          {isMatched ? <Icon name="Check" size={14} /> : isSelected ? "🔊" : "?"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* JUEGO 3: SECUENCIAS */}
+              {activeGame === 'simon' && (
+                <div className="space-y-4 max-w-xs mx-auto text-center">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map(num => (
+                      <button
+                        key={num}
+                        onClick={() => handleSimonPress(num)}
+                        disabled={isPlayingSeq}
+                        className={`h-20 rounded-xl font-bold text-xs flex flex-col items-center justify-center ${
+                          isPlayingSeq ? 'opacity-40' : 'hover:scale-102'
+                        } ${
+                          num === 1 ? 'bg-red-400 text-white' : num === 2 ? 'bg-yellow-400 text-black' : 'bg-blue-400 text-white'
+                        }`}
+                      >
+                        <span className="text-base">{num === 1 ? '🔴' : num === 2 ? '🟡' : '🔵'}</span>
+                        <span className="text-[9px] font-extrabold mt-1">Botón {num}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Renderizar la aplicación en el DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
