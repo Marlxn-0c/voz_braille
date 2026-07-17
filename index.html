@@ -809,27 +809,7 @@
       );
     }
 
-    // ==========================================
-    // 4. PANTALLA: JUEGOS DE OÍDO (GamesScreen)
-    // ==========================================
-    function GamesScreen({ speak, highContrast, gameScore, setGameScore }) {
-      const [activeGame, setActiveGame] = useState(null);
 
-      // Juego 1: Adivina el Braille
-      const [quizLetter, setQuizLetter] = useState('a');
-      const [quizOptions, setQuizOptions] = useState([]);
-      const [quizFeedback, setQuizFeedback] = useState(null);
-
-      // Juego 2: Memorama de sonidos
-      const [soundCards, setSoundCards] = useState([]);
-      const [selectedCards, setSelectedCards] = useState([]);
-      const [matchedCards, setMatchedCards] = useState([]);
-      const [isChecking, setIsChecking] = useState(false);
-
-      // Juego 3: Simon Says auditivo
-      const [simonSeq, setSimonSeq] = useState([]);
-      const [userSeq, setUserSeq] = useState([]);
-      const [isPlayingSeq, setIsPlayingSeq] = useState(false);
 
       // --- LOGICA JUEGO 1 ---
       const generateQuiz = () => {
@@ -863,112 +843,7 @@
         }
       };
 
-      // --- LOGICA JUEGO 2 ---
-      const initMemoryGame = () => {
-        const cardData = [
-          { id: 1, soundId: 1, label: "Campana" },
-          { id: 2, soundId: 1, label: "Campana" },
-          { id: 3, soundId: 2, label: "Flauta" },
-          { id: 4, soundId: 2, label: "Flauta" },
-          { id: 5, soundId: 3, label: "Arpa" },
-          { id: 6, soundId: 3, label: "Arpa" },
-          { id: 7, soundId: 4, label: "Tambor" },
-          { id: 8, soundId: 4, label: "Tambor" }
-        ].sort(() => Math.random() - 0.5);
 
-        setSoundCards(cardData);
-        setSelectedCards([]);
-        setMatchedCards([]);
-        setIsChecking(false);
-        speak("Memorama iniciado. Encuentra las parejas de sonidos.");
-      };
-
-      const playSoundCard = (soundId) => {
-        const frequencies = { 1: 261.63, 2: 329.63, 3: 392.00, 4: 523.25 };
-        playTone(frequencies[soundId] || 440, 0.4, 'triangle');
-      };
-
-      const handleCardClick = (idx) => {
-        if (isChecking || selectedCards.includes(idx) || matchedCards.includes(idx)) return;
-        
-        const card = soundCards[idx];
-        playSoundCard(card.soundId);
-        speak(card.label);
-
-        const updated = [...selectedCards, idx];
-        setSelectedCards(updated);
-
-        if (updated.length === 2) {
-          setIsChecking(true);
-          const [first, second] = updated;
-          if (soundCards[first].soundId === soundCards[second].soundId) {
-            setTimeout(() => {
-              setMatchedCards(p => [...p, first, second]);
-              setSelectedCards([]);
-              setIsChecking(false);
-              setGameScore(p => p + 15);
-              playTone(600, 0.2);
-              speak("¡Pareja encontrada!");
-            }, 600);
-          } else {
-            setTimeout(() => {
-              setSelectedCards([]);
-              setIsChecking(false);
-              playTone(180, 0.3);
-            }, 1200);
-          }
-        }
-      };
-
-      // --- LOGICA JUEGO 3 ---
-      const initSimon = () => {
-        const initial = [Math.floor(Math.random() * 3) + 1];
-        setSimonSeq(initial);
-        setUserSeq([]);
-        playSimonSequence(initial);
-        speak("Escucha la secuencia y repítela.");
-      };
-
-      const playSimonSound = (id) => {
-        const freqs = { 1: 300, 2: 400, 3: 500 };
-        playTone(freqs[id], 0.4, 'triangle');
-      };
-
-      const playSimonSequence = async (sequence) => {
-        setIsPlayingSeq(true);
-        for (let i = 0; i < sequence.length; i++) {
-          await new Promise(r => setTimeout(r, 600));
-          playSimonSound(sequence[i]);
-        }
-        setIsPlayingSeq(false);
-      };
-
-      const handleSimonPress = (id) => {
-        if (isPlayingSeq) return;
-        playSimonSound(id);
-        const updated = [...userSeq, id];
-        setUserSeq(updated);
-
-        const step = updated.length - 1;
-        if (updated[step] !== simonSeq[step]) {
-          playTone(150, 0.5, 'sawtooth');
-          speak("Fallo. Intenta de nuevo.");
-          setUserSeq([]);
-          setSimonSeq([]);
-          return;
-        }
-
-        if (updated.length === simonSeq.length) {
-          setGameScore(p => p + 20);
-          speak("¡Correcto!");
-          setTimeout(() => {
-            const next = [...simonSeq, Math.floor(Math.random() * 3) + 1];
-            setSimonSeq(next);
-            setUserSeq([]);
-            playSimonSequence(next);
-          }, 1000);
-        }
-      };
 
       return (
         <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
@@ -1064,62 +939,6 @@
                 </div>
               )}
 
-              {/* JUEGO 2: MEMORAMA */}
-              {activeGame === 'memory' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
-                    {soundCards.map((card, idx) => {
-                      const isSelected = selectedCards.includes(idx);
-                      const isMatched = matchedCards.includes(idx);
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleCardClick(idx)}
-                          className={`h-14 rounded-xl flex items-center justify-center border text-sm font-bold ${
-                            isMatched 
-                              ? 'bg-green-100 border-green-300 opacity-60'
-                              : isSelected
-                                ? 'bg-[#9A5071] text-white border-transparent'
-                                : 'bg-gray-100 border-gray-200'
-                          }`}
-                        >
-                          {isMatched ? <Icon name="Check" size={14} /> : isSelected ? "🔊" : "?"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* JUEGO 3: SECUENCIAS */}
-              {activeGame === 'simon' && (
-                <div className="space-y-4 max-w-xs mx-auto text-center">
-                  <div className="grid grid-cols-3 gap-2">
-                    {[1, 2, 3].map(num => (
-                      <button
-                        key={num}
-                        onClick={() => handleSimonPress(num)}
-                        disabled={isPlayingSeq}
-                        className={`h-20 rounded-xl font-bold text-xs flex flex-col items-center justify-center ${
-                          isPlayingSeq ? 'opacity-40' : 'hover:scale-102'
-                        } ${
-                          num === 1 ? 'bg-red-400 text-white' : num === 2 ? 'bg-yellow-400 text-black' : 'bg-blue-400 text-white'
-                        }`}
-                      >
-                        <span className="text-base">{num === 1 ? '🔴' : num === 2 ? '🟡' : '🔵'}</span>
-                        <span className="text-[9px] font-extrabold mt-1">Botón {num}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-        </div>
-      );
-    }
 
     // Renderizar la aplicación en el DOM
     const root = ReactDOM.createRoot(document.getElementById('root'));
