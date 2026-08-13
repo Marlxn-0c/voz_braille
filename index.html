@@ -1,802 +1,1346 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Braille Voz - Cuentos que se escuchan, historias que se sienten</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- React 18 & ReactDOM 18 CDN -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- Babel Standalone para compilar JSX en tiempo de ejecución -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Volume2, VolumeX, BookOpen, Gamepad2, Sparkles, 
+  ChevronRight, Play, Pause, RotateCcw, HelpCircle, 
+  ArrowLeft, Check, AlertCircle, Award, Volume1, Eye, EyeOff
+} from 'lucide-react';
 
-  <style>
-    /* Animación de entrada suave */
-    .animate-fadeIn {
-      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+// Paleta de colores mapeada:
+// Principal: #2F3559 (Azul Marino Profundo)
+// Secundario: #9A5071 (Plum/Ciruela)
+// Terciario/Suave: #E394A7 (Rosa Profundo)
+// Claro: #F1BBBB (Rosa Suave)
+// Fondo: #E6D8CB (Crema/Beige Cálido)
+
+// Abecedario Braille mapeado (Puntos del 1 al 6)
+// 1  4
+// 2  5
+// 3  6
+const BRAILLE_ALPHABET = {
+  a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5],
+  f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],
+  k: [1, 3], l: [1, 2, 3], m: [1, 3, 4], n: [1, 3, 4, 5], o: [1, 3, 5],
+  p: [1, 2, 3, 4], q: [1, 2, 3, 4, 5], r: [1, 2, 3, 5], s: [2, 3, 4], t: [2, 3, 4, 5],
+  u: [1, 3, 6], v: [1, 2, 3, 6], w: [2, 4, 5, 6], x: [1, 3, 4, 6], y: [1, 3, 4, 5, 6], z: [1, 3, 5, 6]
+};
+
+// Cuentos predefinidos ricos en descripciones sensoriales (sonidos, texturas, olores)
+const INITIAL_STORIES = [
+  {
+    id: 1,
+    title: "El Concierto del Bosque Susurrante",
+    summary: "Acompaña a Mateo a descubrir que los árboles y el viento tocan la melodía más hermosa del mundo.",
+    content: "Mateo cerró los ojos y respiró hondo. El aire olía a tierra mojada y a pino fresco. A su alrededor, el bosque no estaba en silencio; estaba lleno de música. Bajo sus pies, las hojas secas crujían suavemente con un sonido rítmico, como maracas de la naturaleza. De repente, un silbido suave recorrió las copas de los árboles: era el viento jugando a ser un flautista. Mateo extendió sus manos y tocó la corteza de un viejo roble; era áspera, rugosa y cálida, llena de surcos que contaban historias de cien años. En ese momento, un coro de pájaros comenzó a cantar desde lo alto. Mateo sonrió, entendiendo que no necesitaba ver el bosque para sentir su maravilloso concierto.",
+    sensoryFocus: "Oído y Tacto"
+  },
+  {
+    id: 2,
+    title: "La Búsqueda del Aroma Perdido",
+    summary: "La perrita guía Luna ayuda a resolver el misterio de las flores de vainilla en el jardín de las caricias.",
+    content: "Luna, la labradora de pelaje suave como el algodón, dio tres golpecitos con su nariz húmeda en la mano de Sofía. Era la señal para iniciar la aventura matutina. Hoy el jardín olía diferente. Caminaron sobre el sendero de piedras redondas y lisas que se sentían frescas bajo los pies descalzos. Al acercarse a las flores, un aroma dulce, cálido y reconfortante inundó el aire: ¡era vainilla! Sofía extendió sus dedos y acarició los pétalos aterciopelados de una gran flor. Al tocarlos, un polvillo fino y aromático quedó en sus dedos, oliendo a galletas recién horneadas. Luna soltó un alegre ladrido y movió la cola rítmicamente contra el pasto mullido. Juntas habían descubierto que la felicidad tiene aroma a vainilla y textura de pétalo.",
+    sensoryFocus: "Olfato y Tacto"
+  },
+  {
+    id: 3,
+    title: "El Viaje de las Estrellas de Mar",
+    summary: "Una aventura a la orilla del océano sintiendo la arena tibia, la brisa salada y el vaivén de las olas.",
+    content: "El sonido del mar era un susurro constante que iba y venía: 'Shhh... shhh...'. Cada ola que llegaba a la orilla dejaba una espuma fresca que hacía cosquillas en los tobillos de Tomás. La arena bajo sus pies estaba tibia por el sol del mediodía y se escurría suavemente entre sus dedos como agua seca. Tomás se agachó y enterró las manos. Encontró algo pequeño, liso y con forma de estrella. Tenía una textura ligeramente rugosa en los bordes pero un centro suave. Al acercarla a su oído, no solo escuchó el viento marino, sino que sintió la brisa salada acariciándole la cara. El océano entero estaba hablándole con su voz de espuma y caricias de arena.",
+    sensoryFocus: "Tacto y Sonido"
+  }
+];
+
+// Audio Helper usando Web Audio API para efectos de sonido sin necesidad de archivos externos
+const playTone = (frequency, duration = 0.3, type = 'sine') => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+    
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    console.log("AudioContext no iniciado aún o no soportado por el navegador.");
+  }
+};
+
+export default function App() {
+  // Estados de navegación y configuración general
+  const [activeTab, setActiveTab] = useState('home'); // 'home', 'braille', 'cuentos', 'juegos'
+  const [voiceOverEnabled, setVoiceOverEnabled] = useState(true);
+  const [highContrast, setHighContrast] = useState(false);
+  const [speechRate, setSpeechRate] = useState(1);
+  
+  // Estado para el Abecedario e interactivos
+  const [brailleSearchText, setBrailleSearchText] = useState('');
+  const [customBrailleCell, setCustomBrailleCell] = useState([]); // Array de puntos activos [1..6]
+  
+  // Estado para Cuentos e IA
+  const [stories, setStories] = useState(INITIAL_STORIES);
+  const [selectedStory, setSelectedStory] = useState(null);
+  const [isPlayingStory, setIsPlayingStory] = useState(false);
+  const [aiStoryTopic, setAiStoryTopic] = useState('');
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [aiError, setAiError] = useState('');
+  
+  // Estados de los Juegos
+  const [gameScore, setGameScore] = useState(0);
+  // Juego 1: Adivina el Braille
+  const [quizLetter, setQuizLetter] = useState('a');
+  const [quizOptions, setQuizOptions] = useState([]);
+  const [quizFeedback, setQuizFeedback] = useState(null); // { success: boolean, message: string }
+  // Juego 2: Memorama de sonidos
+  const [soundCards, setSoundCards] = useState([]);
+  const [selectedCards, setSelectedCards] = useState([]);
+  const [matchedCards, setMatchedCards] = useState([]);
+  const [isCheckingCards, setIsCheckingCards] = useState(false);
+  // Juego 3: Secuencia Auditiva
+  const [simonSequence, setSimonSequence] = useState([]);
+  const [userSequence, setUserSequence] = useState([]);
+  const [isSimonPlaying, setIsSimonPlaying] = useState(false);
+  const [simonStep, setSimonStep] = useState(0);
+
+  // Referencias para control de voz
+  const speechUtteranceRef = useRef(null);
+
+  // Efecto inicializador para voz de bienvenida
+  useEffect(() => {
+    speak("Bienvenido a Braille Voz. Cuentos que se escuchan, historias que se sienten. Toca cualquier elemento para escucharlo.");
+    generateNewQuizQuestion();
+  }, []);
+
+  // Función de Síntesis de voz integrada
+  const speak = (text) => {
+    if (!voiceOverEnabled) return;
+    try {
+      window.speechSynthesis.cancel(); // Detener cualquier lectura previa
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-MX';
+      utterance.rate = speechRate;
+      speechUtteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error("Error en la síntesis de voz:", e);
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
-</head>
-<body class="m-0 p-0 overflow-x-hidden">
-  
-  <!-- Contenedor principal donde se montará React -->
-  <div id="root"></div>
+  };
 
-  <!-- Script que contiene el código de la aplicación React compilado por Babel -->
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+  // Detener voz activa
+  const stopSpeaking = () => {
+    try {
+      window.speechSynthesis.cancel();
+      setIsPlayingStory(false);
+    } catch (e) {}
+  };
 
-    // ==========================================
-    // CONSTANTES Y ALFABETO BRAILLE
-    // ==========================================
-    const BRAILLE_ALPHABET = {
-      a: [1], b: [1, 2], c: [1, 4], d: [1, 4, 5], e: [1, 5],
-      f: [1, 2, 4], g: [1, 2, 4, 5], h: [1, 2, 5], i: [2, 4], j: [2, 4, 5],
-      k: [1, 3], l: [1, 2, 3], m: [1, 3, 4], n: [1, 3, 4, 5], o: [1, 3, 5],
-      p: [1, 2, 3, 4], q: [1, 2, 3, 4, 5], r: [1, 2, 3, 5], s: [2, 3, 4], t: [2, 3, 4, 5],
-      u: [1, 3, 6], v: [1, 2, 3, 6], w: [2, 4, 5, 6], x: [1, 3, 4, 6], y: [1, 3, 4, 5, 6], z: [1, 3, 5, 6]
+  // Generador de sonidos del Memorama
+  const playSoundForCard = (id) => {
+    // 4 sonidos únicos basados en frecuencias armónicas
+    const frequencies = {
+      1: 261.63, // Do
+      2: 329.63, // Mi
+      3: 392.00, // Sol
+      4: 523.25, // Do Alto
     };
+    playTone(frequencies[id] || 440, 0.4, 'triangle');
+  };
 
-    const INITIAL_STORIES = [
-      {
-        id: 1,
-        title: "El Concierto del Bosque",
-        summary: "Acompaña a Mateo a descubrir que los árboles y el viento tocan la melodía más hermosa del mundo.",
-        content: "Mateo cerró los ojos y respiró hondo. El aire olía a tierra mojada y a pino fresco. A su alrededor, el bosque no estaba en silencio; estaba lleno de música. Bajo sus pies, las hojas secas crujían suavemente con un sonido rítmico, como maracas de la naturaleza. De repente, un silbido suave recorrió las copas de los árboles: era el viento jugando a ser un flautista. Mateo extendió sus manos y tocó la corteza de un viejo roble; era áspera, rugosa y cálida, llena de surcos que contaban historias de cien años. En ese momento, un coro de pájaros comenzó a cantar desde lo alto. Mateo sonrió, entendiendo que no necesitaba ver el bosque para sentir su maravilloso concierto.",
-        sensoryFocus: "Oído y Tacto"
-      },
-      {
-        id: 2,
-        title: "El Aroma Perdido",
-        summary: "La perrita guía Luna ayuda a resolver el misterio de las flores de vainilla en el jardín.",
-        content: "Luna, la labradora de pelaje suave como el algodón, dio tres golpecitos con su nariz húmeda en la mano de Sofía. Era la señal para iniciar la aventura matutina. Hoy el jardín olía diferente. Caminaron sobre el sendero de piedras redondas y lisas que se sentían frescas bajo los pies descalzos. Al acercarse a las flores, un aroma dulce, cálido y reconfortante inundó el aire: ¡era vainilla! Sofía extendió sus dedos y acarició los pétalos aterciopelados de una gran flor. Al tocarlos, un polvillo fino y aromático quedó en sus dedos, oliendo a galletas recién horneadas. Luna soltó un alegre ladrido y movió la cola rítmicamente contra el pasto mullido. Juntas habían descubierto que la felicidad tiene aroma a vainilla y textura de pétalo.",
-        sensoryFocus: "Olfato y Tacto"
-      },
-      {
-        id: 3,
-        title: "Estrellas de Mar",
-        summary: "Una aventura a la orilla del océano sintiendo la arena tibia, la brisa salada y el vaivén de las olas.",
-        content: "El sonido del mar era un susurro constante que iba y venía: 'Shhh... shhh...'. Cada ola que llegaba a la orilla dejaba una espuma fresca que hacía cosquillas en los tobillos de Tomás. La arena bajo sus pies estaba tibia por el sol del mediodía y se escurría suavemente entre sus dedos como agua seca. Tomás se agachó y enterró las manos. Encontró algo pequeño, liso y con forma de estrella. Tenía una textura ligeramente rugosa en los bordes pero un centro suave. Al acercarla a su oído, no solo escuchó el viento marino, sino que sintió la brisa salada acariciándole la cara. El océano entero estaba hablándole con su voz de espuma y caricias de arena.",
-        sensoryFocus: "Tacto y Sonido"
+  // --- LÓGICA JUEGO 1: ADIVINA EL BRAILLE ---
+  const generateNewQuizQuestion = () => {
+    const letters = Object.keys(BRAILLE_ALPHABET);
+    const correct = letters[Math.floor(Math.random() * letters.length)];
+    setQuizLetter(correct);
+    
+    // Generar 3 opciones incorrectas
+    let options = [correct];
+    while (options.length < 4) {
+      const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+      if (!options.includes(randomLetter)) {
+        options.push(randomLetter);
       }
+    }
+    // Barajar opciones
+    options.sort(() => Math.random() - 0.5);
+    setQuizOptions(options);
+    setQuizFeedback(null);
+  };
+
+  const handleQuizAnswer = (selectedLetter) => {
+    if (quizFeedback) return; // Esperar siguiente pregunta
+    const isCorrect = selectedLetter === quizLetter;
+    if (isCorrect) {
+      setGameScore(prev => prev + 10);
+      playTone(523.25, 0.15, 'sine'); // Do
+      setTimeout(() => playTone(659.25, 0.3, 'sine'), 150); // Mi (Acierto)
+      setQuizFeedback({ success: true, message: `¡Excelente! Sí, representa la letra "${selectedLetter.toUpperCase()}"` });
+      speak(`¡Excelente! Correcto, representa la letra ${selectedLetter.toUpperCase()}`);
+    } else {
+      playTone(220, 0.4, 'sawtooth'); // Error
+      setQuizFeedback({ success: false, message: `Inténtalo de nuevo. Era la letra "${quizLetter.toUpperCase()}"` });
+      speak(`Oh, inténtalo de nuevo. Esa era la letra ${quizLetter.toUpperCase()}`);
+    }
+  };
+
+  // --- LÓGICA JUEGO 2: MEMORAMA DE SONIDOS ---
+  const startSoundMemoryGame = () => {
+    // 4 sonidos emparejados (8 cartas en total)
+    const cardData = [
+      { id: 1, soundId: 1, label: "Sonido Campana" },
+      { id: 2, soundId: 1, label: "Sonido Campana" },
+      { id: 3, soundId: 2, label: "Sonido Flauta" },
+      { id: 4, soundId: 2, label: "Sonido Flauta" },
+      { id: 5, soundId: 3, label: "Sonido Arpa" },
+      { id: 6, soundId: 3, label: "Sonido Arpa" },
+      { id: 7, soundId: 4, label: "Sonido Tambor" },
+      { id: 8, soundId: 4, label: "Sonido Tambor" }
     ];
+    // Barajar
+    cardData.sort(() => Math.random() - 0.5);
+    setSoundCards(cardData);
+    setSelectedCards([]);
+    setMatchedCards([]);
+    setIsCheckingCards(false);
+    speak("Memorama de sonidos iniciado. Haz clic en las tarjetas para escuchar y encontrar las parejas de sonidos.");
+  };
 
-    // Reproductor de Tonos sintetizados con Web Audio API
-    const playTone = (frequency, duration = 0.3, type = 'sine') => {
+  const handleCardClick = (index) => {
+    if (isCheckingCards || selectedCards.includes(index) || matchedCards.includes(index)) return;
+    
+    const card = soundCards[index];
+    playSoundForCard(card.soundId);
+    speak(card.label);
+
+    const newSelected = [...selectedCards, index];
+    setSelectedCards(newSelected);
+
+    if (newSelected.length === 2) {
+      setIsCheckingCards(true);
+      const firstCard = soundCards[newSelected[0]];
+      const secondCard = soundCards[newSelected[1]];
+
+      if (firstCard.soundId === secondCard.soundId) {
+        // Acierto
+        setTimeout(() => {
+          setMatchedCards(prev => [...prev, newSelected[0], newSelected[1]]);
+          setSelectedCards([]);
+          setIsCheckingCards(false);
+          setGameScore(prev => prev + 15);
+          playTone(600, 0.2, 'sine');
+          speak("¡Pareja encontrada!");
+        }, 600);
+      } else {
+        // Fallo
+        setTimeout(() => {
+          setSelectedCards([]);
+          setIsCheckingCards(false);
+          playTone(180, 0.3, 'sine');
+        }, 1200);
+      }
+    }
+  };
+
+  // --- LÓGICA JUEGO 3: SECUENCIA AUDITIVA ---
+  const startSimonGame = () => {
+    const initialSeq = [Math.floor(Math.random() * 3) + 1];
+    setSimonSequence(initialSeq);
+    setUserSequence([]);
+    playSequence(initialSeq);
+    speak("Escucha atentamente el orden de los sonidos y repítelos en el mismo orden usando los tres botones gigantes.");
+  };
+
+  const playSequence = async (sequence) => {
+    setIsSimonPlaying(true);
+    for (let i = 0; i < sequence.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      playSimonSound(sequence[i]);
+    }
+    setIsSimonPlaying(false);
+  };
+
+  const playSimonSound = (id) => {
+    const freqs = { 1: 300, 2: 400, 3: 500 };
+    playTone(freqs[id], 0.4, 'triangle');
+  };
+
+  const handleSimonInput = (id) => {
+    if (isSimonPlaying) return;
+    playSimonSound(id);
+    const newUserSeq = [...userSequence, id];
+    setUserSequence(newUserSeq);
+
+    // Verificar paso
+    const currentStep = newUserSeq.length - 1;
+    if (newUserSeq[currentStep] !== simonSequence[currentStep]) {
+      // Error
+      playTone(150, 0.5, 'sawtooth');
+      speak("Secuencia incorrecta. Vuelve a intentarlo.");
+      setUserSequence([]);
+      setSimonSequence([]);
+      return;
+    }
+
+    if (newUserSeq.length === simonSequence.length) {
+      // Secuencia completada con éxito
+      setGameScore(prev => prev + 20);
+      speak("¡Bien hecho! Siguiente nivel.");
+      setTimeout(() => {
+        const nextSeq = [...simonSequence, Math.floor(Math.random() * 3) + 1];
+        setSimonSequence(nextSeq);
+        setUserSequence([]);
+        playSequence(nextSeq);
+      }, 1000);
+    }
+  };
+
+
+  // --- MANEJO DE SÍNTESIS DE CUENTOS (LECTURA AUTOMÁTICA EN CUENTOS) ---
+  const handlePlayStory = (story) => {
+    setSelectedStory(story);
+    setIsPlayingStory(true);
+    speak(`NARRACIÓN DE: ${story.title}. ... ${story.content}`);
+  };
+
+  const handlePauseStory = () => {
+    window.speechSynthesis.pause();
+    setIsPlayingStory(false);
+    speak("Lectura pausada");
+  };
+
+  const handleResumeStory = () => {
+    window.speechSynthesis.resume();
+    setIsPlayingStory(true);
+  };
+
+  const handleStopStory = () => {
+    window.speechSynthesis.cancel();
+    setIsPlayingStory(false);
+    setSelectedStory(null);
+  };
+
+
+  // --- GENERACIÓN DE CUENTO CON INTELIGENCIA ARTIFICIAL GEMINI ---
+  const generateStoryWithAI = async () => {
+    if (!aiStoryTopic.trim()) {
+      speak("Por favor, escribe o indica un tema para el cuento.");
+      return;
+    }
+
+    setIsGeneratingStory(true);
+    setAiError('');
+    speak("Conectando con la imaginación de la inteligencia artificial. Creando tu cuento personalizado, por favor espera un momento.");
+
+    const apiKey = ""; // La clave se inyectará en tiempo de ejecución
+    const systemPrompt = "Eres un escritor especialista en literatura infantil adaptada para niños con discapacidad visual. Generas cuentos cortos (de 3 a 4 párrafos cortos) con una carga sensorial EXTREMA: describe detalladamente los sonidos, las texturas, los olores, la temperatura y las emociones de los personajes. Utiliza un tono cálido, reconfortante y mágico. Escribe el cuento completamente en español.";
+    const userPrompt = `Escribe un cuento infantil mágico, muy sensorial y descriptivo sobre: "${aiStoryTopic}". El protagonista del cuento debe ser un perrito guía de raza Golden Retriever llamado "Braillito" que acompaña al personaje principal.`;
+
+    // Implementación de reintentos con exponencial backoff para estabilidad de API
+    let attempt = 0;
+    const maxAttempts = 3;
+    let delay = 1000;
+
+    const callApi = async () => {
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: userPrompt }] }],
+              systemInstruction: { parts: [{ text: systemPrompt }] }
+            })
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Error en respuesta: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        oscillator.type = type;
-        oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-        
-        gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + duration);
-      } catch (e) {
-        console.log("AudioContext no iniciado o no soportado.");
+        if (!textResponse) {
+          throw new Error("Estructura de respuesta inválida de Gemini.");
+        }
+
+        return textResponse;
+      } catch (error) {
+        if (attempt < maxAttempts - 1) {
+          attempt++;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+          return callApi();
+        } else {
+          throw error;
+        }
       }
     };
 
-    // Componente de Iconos SVG interno (Sustituto rápido para Tailwind)
-    function Icon({ name, size = 18, className = "" }) {
-      const icons = {
-        Volume1: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>,
-        Volume2: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>,
-        VolumeX: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>,
-        BookOpen: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>,
-        Sparkles: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"></path></svg>,
-        ChevronRight: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>,
-        Play: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>,
-        Pause: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>,
-        RotateCcw: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0-.57-8.38l5.67-5.67"></path></svg>,
-        ArrowLeft: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>,
-        Eye: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>,
-        EyeOff: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>,
-        Search: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
-        Plus: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
-        List: <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+    try {
+      const generatedText = await callApi();
+      const newStory = {
+        id: Date.now(),
+        title: `Aventura de: ${aiStoryTopic.substring(0, 25)}...`,
+        summary: `Un cuento mágico creado por IA sobre ${aiStoryTopic}.`,
+        content: generatedText,
+        sensoryFocus: "Multisensorial (IA)"
       };
-      return icons[name] || null;
+
+      setStories(prev => [newStory, ...prev]);
+      setSelectedStory(newStory);
+      setIsGeneratingStory(false);
+      setAiStoryTopic('');
+      speak(`¡Tu cuento ha sido creado con éxito! Se titula: ${newStory.title}. ¿Quieres que lo lea para ti?`);
+    } catch (err) {
+      console.error(err);
+      setIsGeneratingStory(false);
+      setAiError('No pudimos conectar con la IA de cuentos en este momento. Inténtalo de nuevo.');
+      speak("Hubo un pequeño problema al conectar con el servidor de cuentos. Por favor, inténtalo de nuevo.");
     }
+  };
 
-    // ==========================================
-    // COMPONENTE PRINCIPAL (APP)
-    // ==========================================
-    function App() {
-      const [activeTab, setActiveTab] = useState('home');
-      const [voiceOverEnabled, setVoiceOverEnabled] = useState(true);
-      const [highContrast, setHighContrast] = useState(false);
-      const [speechRate, setSpeechRate] = useState(1);
-      const [stories, setStories] = useState(INITIAL_STORIES);
 
-      const speechUtteranceRef = useRef(null);
-
-      useEffect(() => {
-        speak("Bienvenido a Braille Voz. Toca cualquier elemento para escucharlo.");
-      }, []);
-
-      const speak = (text) => {
-        if (!voiceOverEnabled) return;
-        try {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.lang = 'es-MX';
-          utterance.rate = speechRate;
-          speechUtteranceRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-        } catch (e) {
-          console.error("Error en la síntesis de voz:", e);
-        }
-      };
-
-      const menuItems = [
-        { id: 'home', label: 'Inicio', icon: <Icon name="Volume1" size={18} /> },
-        { id: 'braille', label: 'Abecedario', icon: <Icon name="BookOpen" size={18} /> },
-        { id: 'cuentos', label: 'Cuentos', icon: <Icon name="Sparkles" size={18} /> }
-      ];
-
+  // --- TRADUCCIÓN INTERACTIVA DE TEXTO A BRAILLE ---
+  const renderBrailleWord = (word) => {
+    return word.toLowerCase().split('').map((char, index) => {
+      const activeDots = BRAILLE_ALPHABET[char] || [];
+      if (!BRAILLE_ALPHABET[char] && char !== ' ') return null;
+      
       return (
-        <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 pb-20 md:pb-0 ${
-          highContrast ? 'bg-black text-yellow-300' : 'bg-[#E6D8CB] text-[#2F3559]'
-        }`}>
-          
-          {/* HEADER COMPACTADO */}
-          <header className={`border-b shadow-sm ${
-            highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-[#2F3559] text-[#E6D8CB] border-[#9A5071]/20'
-          }`}>
-            <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
-              
-              {/* Logo */}
+        <div key={index} className="flex flex-col items-center p-2 bg-white rounded-lg shadow-sm border border-[#E394A7]/30 min-w-[70px]">
+          <span className="text-xs font-bold text-[#2F3559] mb-1">{char === ' ' ? 'Espacio' : char.toUpperCase()}</span>
+          <div className="grid grid-cols-2 gap-1.5 p-1.5 bg-[#E6D8CB]/50 rounded">
+            {[1, 4, 2, 5, 3, 6].map(dotNum => (
               <div 
-                className="flex items-center gap-2.5 cursor-pointer select-none"
-                onClick={() => { setActiveTab('home'); speak("Volver al Inicio"); }}
+                key={dotNum}
+                className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
+                  activeDots.includes(dotNum) 
+                    ? 'bg-[#9A5071] scale-110 shadow-sm' 
+                    : 'bg-gray-300'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    });
+  };
+
+  // Alternar puntos de la celda braille personalizada
+  const toggleCustomDot = (dot) => {
+    let newCell;
+    if (customBrailleCell.includes(dot)) {
+      newCell = customBrailleCell.filter(d => d !== dot);
+    } else {
+      newCell = [...customBrailleCell, dot].sort();
+    }
+    setCustomBrailleCell(newCell);
+    
+    // Identificar si corresponde a alguna letra
+    const matchedLetter = Object.keys(BRAILLE_ALPHABET).find(letter => {
+      const dots = BRAILLE_ALPHABET[letter];
+      return dots.length === newCell.length && dots.every(v => newCell.includes(v));
+    });
+
+    if (matchedLetter) {
+      playTone(440, 0.15, 'sine');
+      speak(`Has formado la letra: ${matchedLetter.toUpperCase()}`);
+    } else {
+      playTone(330, 0.1, 'sine');
+    }
+  };
+
+  // Obtener letra correspondiente de la celda actual
+  const getMatchedCustomLetter = () => {
+    return Object.keys(BRAILLE_ALPHABET).find(letter => {
+      const dots = BRAILLE_ALPHABET[letter];
+      return dots.length === customBrailleCell.length && dots.every(v => customBrailleCell.includes(v));
+    }) || null;
+  };
+
+  return (
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${
+      highContrast ? 'bg-black text-yellow-300' : 'bg-[#E6D8CB] text-[#2F3559]'
+    }`}>
+      
+      {/* HEADER DE ACCESIBILIDAD Y LOGOTIPO INTEGRADO */}
+      <header className={`border-b shadow-md ${
+        highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-[#2F3559] text-[#E6D8CB] border-[#9A5071]/20'
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          {/* SIMULACIÓN Y ESPACIO DEL LOGOTIPO "BRAILLE VOZ" */}
+          <div 
+            className="flex items-center gap-4 cursor-pointer select-none"
+            onClick={() => {
+              setActiveTab('home');
+              speak("Volver al Inicio");
+            }}
+            aria-label="Braille Voz - Volver a pantalla de inicio"
+          >
+            {/* CONTENEDOR DEL LOGOTIPO:
+              Este contenedor intenta cargar el logotipo "logotipo de braille voz.jpeg" que has subido.
+              Si la imagen no se encuentra en el servidor local, muestra automáticamente un marcador 
+              punteado limpio que dice "Logo" para que puedas configurar la ruta exacta que desees.
+            */}
+            <div className="w-20 h-20 bg-white/10 rounded-2xl border-2 border-dashed border-[#F1BBBB]/40 flex items-center justify-center overflow-hidden transition-all hover:border-[#F1BBBB]">
+              <img 
+                src="logotipo de braille voz.jpeg" 
+                alt="Logotipo de Braille Voz" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  // Si no carga la ruta directa, se oculta la imagen rota y se despliega el marcador alternativo
+                  e.target.style.display = 'none';
+                  const fallback = e.target.nextSibling;
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
+              />
+              <div className="hidden flex-col items-center justify-center text-center p-1 text-[10px] text-[#E6D8CB] font-bold">
+                <span className="text-2xl mb-0.5">🐾</span>
+                <span>Braille Voz</span>
+              </div>
+            </div>
+
+            <div>
+              <h1 className="text-2xl font-black tracking-tight leading-none flex gap-1">
+                <span className="text-[#E6D8CB]">braille</span>
+                <span className="text-[#F1BBBB]">voz</span>
+              </h1>
+              <p className="text-[10px] md:text-xs text-[#E6D8CB]/85 font-medium tracking-wide italic mt-1">
+                "Cuentos que se escuchan, historias que se sienten"
+              </p>
+              {/* Símbolo braille simulado en el logo */}
+              <div className="flex gap-1 mt-1 opacity-75">
+                <span className="text-[9px] tracking-widest text-[#E394A7]">⠃⠗⠓⠊⠇⠇⠑</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CONTROLES RÁPIDOS DE ACCESIBILIDAD */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Lector Integrado de la App */}
+            <button 
+              onClick={() => {
+                const newVal = !voiceOverEnabled;
+                setVoiceOverEnabled(newVal);
+                if (newVal) {
+                  setTimeout(() => speak("Lector interno activado. Al pasar el ratón o pulsar escucharás el contenido."), 300);
+                } else {
+                  window.speechSynthesis.cancel();
+                }
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 ${
+                voiceOverEnabled 
+                  ? 'bg-[#9A5071] text-white shadow-md hover:bg-[#9A5071]/80' 
+                  : 'bg-[#E6D8CB]/20 text-[#E6D8CB] border border-[#E6D8CB]/30'
+              }`}
+              title="Activar/Desactivar lectura en voz alta"
+              onMouseEnter={() => speak("Alternar lector de voz interna")}
+            >
+              {voiceOverEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              <span>{voiceOverEnabled ? "Voz Activada" : "Voz Silenciada"}</span>
+            </button>
+
+            {/* Ajuste de velocidad de voz */}
+            {voiceOverEnabled && (
+              <div className="flex items-center gap-1.5 bg-black/15 px-3 py-1.5 rounded-full">
+                <span className="text-[10px] text-[#E6D8CB] font-bold">VELOCIDAD:</span>
+                <button 
+                  onClick={() => { setSpeechRate(0.8); speak("Velocidad lenta"); }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${speechRate === 0.8 ? 'bg-[#9A5071] text-white' : 'text-[#E6D8CB]'}`}
+                >
+                  Lenta
+                </button>
+                <button 
+                  onClick={() => { setSpeechRate(1); speak("Velocidad normal"); }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${speechRate === 1 ? 'bg-[#9A5071] text-white' : 'text-[#E6D8CB]'}`}
+                >
+                  Norm
+                </button>
+                <button 
+                  onClick={() => { setSpeechRate(1.3); speak("Velocidad rápida"); }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${speechRate === 1.3 ? 'bg-[#9A5071] text-white' : 'text-[#E6D8CB]'}`}
+                >
+                  Rápida
+                </button>
+              </div>
+            )}
+
+            {/* Alto Contraste */}
+            <button 
+              onClick={() => {
+                const nextVal = !highContrast;
+                setHighContrast(nextVal);
+                speak(nextVal ? "Contraste negro y amarillo activado." : "Colores originales restablecidos.");
+              }}
+              className={`p-2 rounded-full transition-all duration-200 ${
+                highContrast 
+                  ? 'bg-yellow-300 text-black' 
+                  : 'bg-[#9A5071]/20 text-[#E6D8CB] hover:bg-[#9A5071]/40 border border-[#E6D8CB]/20'
+              }`}
+              title="Cambiar a Alto Contraste para debilidad visual"
+              onMouseEnter={() => speak("Cambiar contraste de pantalla")}
+            >
+              {highContrast ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
+          </div>
+
+        </div>
+      </header>
+
+      {/* MENÚ DE NAVEGACIÓN PRINCIPAL */}
+      <nav className={`sticky top-0 z-10 shadow-sm ${
+        highContrast ? 'bg-zinc-800 text-yellow-300 border-b border-yellow-300' : 'bg-[#9A5071] text-[#E6D8CB]'
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 flex justify-around">
+          {[
+            { id: 'home', label: 'Inicio', icon: <Volume1 size={18} /> },
+            { id: 'braille', label: 'Abecedario Braille', icon: <BookOpen size={18} /> },
+            { id: 'cuentos', label: 'Cuentos Sensoriales', icon: <Sparkles size={18} /> },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                speak(`Sección ${tab.label}`);
+              }}
+              onMouseEnter={() => speak(tab.label)}
+              className={`flex items-center gap-2 py-3 px-3 md:px-6 text-sm font-bold border-b-4 transition-all duration-200 ${
+                activeTab === tab.id 
+                  ? (highContrast ? 'border-yellow-300 bg-black text-yellow-300' : 'border-[#F1BBBB] bg-[#2F3559] text-[#E6D8CB]')
+                  : 'border-transparent hover:bg-black/10'
+              }`}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* CONTENIDO PRINCIPAL */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+
+        {/* ======================================= */}
+        {/* TAB 1: INICIO (PANTALLA DE BIENVENIDA) */}
+        {/* ======================================= */}
+        {activeTab === 'home' && (
+          <div className="space-y-8 animate-fadeIn">
+            {/* Tarjeta de Bienvenida */}
+            <div className={`p-8 rounded-3xl shadow-lg border text-center transition-all ${
+              highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-[#E394A7]/30 text-[#2F3559]'
+            }`}>
+              <div className="max-w-2xl mx-auto">
+                <div className="inline-flex p-3 bg-[#E6D8CB] rounded-full mb-4">
+                  {/* Pequeño avatar animado de perrito */}
+                  <span className="text-5xl" role="img" aria-label="Perro Labrador">🐕</span>
+                </div>
+                <h2 className="text-3xl font-extrabold mb-3">¡Hola, te damos la bienvenida!</h2>
+                <p className="text-base leading-relaxed mb-6">
+                  Esta es una plataforma completamente inclusiva. Aquí puedes explorar el asombroso alfabeto Braille
+                  o escuchar cuentos mágicos con narraciones interactivas.
+                </p>
+                
+                {/* Botón interactivo central para escuchar presentación */}
+                <button
+                  onClick={() => speak("Braille Voz es un espacio seguro para aprender tocando y escuchando. Explora los botones inferiores para comenzar la diversión.")}
+                  onMouseEnter={() => speak("Escuchar introducción guiada")}
+                  className={`px-8 py-4 rounded-full font-bold text-lg inline-flex items-center gap-3 transition-transform hover:scale-105 ${
+                    highContrast ? 'bg-yellow-300 text-black' : 'bg-[#2F3559] text-[#E6D8CB] hover:bg-[#2F3559]/90 shadow-md'
+                  }`}
+                >
+                  <Volume2 />
+                  <span>Escuchar Introducción</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Accesos rápidos a las secciones con descripción auditiva */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div 
+                onClick={() => { setActiveTab('braille'); speak("Abriendo Abecedario Braille"); }}
+                onMouseEnter={() => speak("Sección Abecedario Braille. Aprende y traduce letras del alfabeto.")}
+                className={`p-6 rounded-2xl shadow-md border cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 ${
+                  highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/20 hover:border-[#9A5071]'
+                }`}
               >
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-white/10 rounded-xl border border-dashed border-[#F1BBBB]/40 flex items-center justify-center overflow-hidden">
-                  <img 
-                    src="logotipo de braille voz.jpeg" 
-                    alt="Logo" 
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      const fallback = e.target.nextSibling;
-                      if (fallback) fallback.classList.remove('hidden');
-                    }}
-                  />
-                  <div className="hidden text-[10px] text-[#E6D8CB] font-bold">🐾</div>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="p-3 bg-[#F1BBBB] rounded-xl text-[#2F3559]">
+                    <BookOpen size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold">Abecedario</h3>
+                </div>
+                <p className="text-sm opacity-90">Aprende los puntos Braille correspondientes a cada letra y utiliza nuestro traductor interactivo.</p>
+                <div className="mt-4 flex items-center gap-1 text-xs font-bold text-[#9A5071]">
+                  <span>Explorar</span> <ChevronRight size={14} />
+                </div>
+              </div>
+
+              <div 
+                onClick={() => { setActiveTab('cuentos'); speak("Abriendo Cuentos Sensoriales"); }}
+                onMouseEnter={() => speak("Sección Cuentos Sensoriales. Escucha narraciones y crea tus propias historias con Inteligencia Artificial.")}
+                className={`p-6 rounded-2xl shadow-md border cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 ${
+                  highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/20 hover:border-[#9A5071]'
+                }`}
+              >
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="p-3 bg-[#E394A7] rounded-xl text-white">
+                    <Sparkles size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold">Cuentos mágicos</h3>
+                </div>
+                <p className="text-sm opacity-90">Historias hermosas narradas que despiertan la imaginación, los olores, sonidos y texturas.</p>
+                <div className="mt-4 flex items-center gap-1 text-xs font-bold text-[#9A5071]">
+                  <span>Escuchar</span> <ChevronRight size={14} />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Sección de Puntajes y Logros del usuario */}
+            <div className={`p-6 rounded-2xl border flex items-center justify-between ${
+              highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-[#2F3559]/5 border-[#2F3559]/20'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="text-yellow-500 animate-pulse">
+                  <Award size={32} />
                 </div>
                 <div>
-                  <h1 className="text-lg md:text-xl font-black leading-none flex gap-0.5">
-                    <span className="text-[#E6D8CB]">braille</span>
-                    <span className="text-[#F1BBBB]">voz</span>
-                  </h1>
-                  <p className="hidden md:block text-[10px] text-[#E6D8CB]/80 italic font-medium mt-0.5">
-                    "Cuentos que se escuchan, historias que se sienten"
+                  <h4 className="text-lg font-bold">Tus Puntos de Explorador</h4>
+                  <p className="text-xs opacity-75">¡Gana puntos completando juegos y adivinanzas auditivas!</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-3xl font-black text-[#9A5071]">{gameScore}</span>
+                <span className="text-xs block font-bold">PUNTOS</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* TAB 2: ABECEDARIO & TRADUCTOR BRAILLE */}
+        {/* ======================================= */}
+        {activeTab === 'braille' && (
+          <div className="space-y-8 animate-fadeIn">
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Celda Braille Interactiva de Aprendizaje */}
+              <div className={`p-6 rounded-3xl shadow-lg border ${
+                highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+              }`}>
+                <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                  <span>Celda Interactiva</span>
+                  <HelpCircle size={18} className="text-[#9A5071]" />
+                </h3>
+                <p className="text-sm opacity-80 mb-6">
+                  Presiona cada uno de los 6 puntos para activar y descubrir qué letra se forma en Braille. El sistema la leerá automáticamente.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-8 py-4">
+                  
+                  {/* Celda Braille Gigante */}
+                  <div className="bg-[#E6D8CB]/40 p-8 rounded-2xl border border-gray-300 grid grid-cols-2 gap-x-12 gap-y-6 w-52 relative shadow-inner">
+                    <span className="absolute top-2 left-4 text-[10px] text-gray-500 font-bold">IZQ (1,2,3)</span>
+                    <span className="absolute top-2 right-4 text-[10px] text-gray-500 font-bold">DER (4,5,6)</span>
+                    
+                    {[1, 4, 2, 5, 3, 6].map(num => {
+                      const isActive = customBrailleCell.includes(num);
+                      return (
+                        <button
+                          key={num}
+                          onClick={() => toggleCustomDot(num)}
+                          onMouseEnter={() => speak(`Punto ${num}`)}
+                          className={`w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-lg transition-all relative ${
+                            isActive 
+                              ? (highContrast ? 'bg-yellow-300 text-black scale-110' : 'bg-[#9A5071] text-white scale-110 shadow-md')
+                              : 'bg-gray-300 hover:bg-gray-400 text-gray-600'
+                          }`}
+                          aria-label={`Punto ${num} ${isActive ? 'activado' : 'desactivado'}`}
+                        >
+                          {num}
+                          {/* Pequeño relieve táctil visual */}
+                          <div className={`absolute inset-1 rounded-full border ${isActive ? 'border-white/30' : 'border-black/5'}`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Resultado de la Letra */}
+                  <div className="text-center sm:text-left flex flex-col items-center justify-center bg-[#2F3559]/5 p-6 rounded-2xl w-44">
+                    <span className="text-xs font-bold tracking-wider opacity-75 uppercase">Letra Formada:</span>
+                    <div className="text-7xl font-black text-[#9A5071] my-2 transition-transform duration-200">
+                      {getMatchedCustomLetter() ? getMatchedCustomLetter().toUpperCase() : '?'}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setCustomBrailleCell([]);
+                        speak("Celda limpia");
+                      }}
+                      className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold rounded-lg transition-colors"
+                      onMouseEnter={() => speak("Limpiar celda interactiva")}
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Traductor de Texto a Braille */}
+              <div className={`p-6 rounded-3xl shadow-lg border flex flex-col justify-between ${
+                highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+              }`}>
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Traductor Instantáneo</h3>
+                  <p className="text-sm opacity-80 mb-4">
+                    Escribe cualquier palabra o frase y observa cómo se compone en relieve Braille.
+                  </p>
+
+                  <div className="space-y-4">
+                    <textarea
+                      value={brailleSearchText}
+                      onChange={(e) => setBrailleSearchText(e.target.value.substring(0, 30))}
+                      placeholder="Escribe algo aquí (máximo 30 letras)..."
+                      className="w-full p-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#9A5071] text-lg bg-[#E6D8CB]/20 text-[#2F3559]"
+                      rows={2}
+                      aria-label="Caja de texto para traducción Braille"
+                    />
+                    
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          if (brailleSearchText) {
+                            speak(`Traducción en Braille de la frase: ${brailleSearchText}`);
+                          }
+                        }}
+                        className="px-4 py-2 rounded-lg text-xs font-bold bg-[#E6D8CB] hover:bg-[#E6D8CB]/80 text-[#2F3559]"
+                      >
+                        Escuchar Texto
+                      </button>
+                      <button
+                        onClick={() => {
+                          setBrailleSearchText('');
+                          speak("Traductor borrado");
+                        }}
+                        className="px-4 py-2 rounded-lg text-xs font-bold bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resultado Traducido */}
+                <div className="mt-6">
+                  <span className="text-xs font-bold block mb-2 text-[#9A5071]">Representación Braille:</span>
+                  <div className="p-4 bg-[#E6D8CB]/30 rounded-xl min-h-[100px] flex flex-wrap gap-2 items-center overflow-x-auto">
+                    {brailleSearchText.trim().length > 0 ? (
+                      renderBrailleWord(brailleSearchText)
+                    ) : (
+                      <span className="text-sm text-gray-500 italic">Escribe una palabra arriba para ver el resultado táctil...</span>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* El abecedario Completo de la A a la Z */}
+            <div className={`p-6 rounded-3xl shadow-lg border ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+            }`}>
+              <h3 className="text-2xl font-bold mb-4">Abecedario Completo (A - Z)</h3>
+              <p className="text-sm mb-6 opacity-80">
+                Pasa el ratón o pulsa sobre cualquier letra para ver sus puntos específicos y escuchar su pronunciación.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4">
+                {Object.keys(BRAILLE_ALPHABET).map(letter => {
+                  const dots = BRAILLE_ALPHABET[letter];
+                  return (
+                    <div 
+                      key={letter}
+                      onClick={() => {
+                        playTone(350 + (letter.charCodeAt(0) * 2), 0.2, 'sine');
+                        speak(`Letra ${letter.toUpperCase()}. Puntos: ${dots.join(', ')}`);
+                      }}
+                      onMouseEnter={() => speak(`Letra ${letter.toUpperCase()}`)}
+                      className="p-3 bg-[#E6D8CB]/20 hover:bg-[#F1BBBB]/40 rounded-2xl border border-[#E394A7]/30 flex flex-col items-center gap-2 cursor-pointer transition-transform hover:scale-105"
+                    >
+                      <span className="text-2xl font-black text-[#2F3559]">{letter.toUpperCase()}</span>
+                      
+                      {/* Celda en miniatura */}
+                      <div className="grid grid-cols-2 gap-1 p-1 bg-white rounded shadow-inner">
+                        {[1, 4, 2, 5, 3, 6].map(d => (
+                          <div 
+                            key={d}
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              dots.includes(d) ? 'bg-[#9A5071]' : 'bg-gray-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      <span className="text-[10px] text-gray-500 font-bold">Puntos: {dots.join(',')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* TAB 3: CUENTOS SENSORIALES CON IA. */}
+        {/* ======================================= */}
+        {activeTab === 'cuentos' && (
+          <div className="space-y-8 animate-fadeIn">
+            
+            {/* Reproductor de Cuento Activo */}
+            {selectedStory && (
+              <div className={`p-6 rounded-3xl shadow-xl border relative ${
+                highContrast ? 'bg-zinc-900 border-yellow-300' : 'bg-gradient-to-br from-[#2F3559] to-[#9A5071] text-[#E6D8CB] border-transparent'
+              }`}>
+                <button 
+                  onClick={handleStopStory}
+                  className="absolute top-4 right-4 text-xs font-bold uppercase tracking-wider py-1 px-3 bg-black/30 hover:bg-black/50 rounded-full transition-colors"
+                >
+                  Cerrar
+                </button>
+
+                <span className="text-[10px] font-bold tracking-widest text-[#F1BBBB] uppercase">NARRACIÓN ACTIVA</span>
+                <h3 className="text-3xl font-black mt-1 mb-2">{selectedStory.title}</h3>
+                
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-black/25 rounded-full">
+                    Enfoque: {selectedStory.sensoryFocus}
+                  </span>
+                </div>
+
+                {/* Texto del Cuento */}
+                <div className="bg-black/25 p-6 rounded-2xl max-h-[300px] overflow-y-auto mb-6 text-sm md:text-base leading-relaxed scrollbar-thin">
+                  {selectedStory.content}
+                </div>
+
+                {/* Controles de Reproducción Auditiva */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    {isPlayingStory ? (
+                      <button 
+                        onClick={handlePauseStory}
+                        className="p-4 bg-[#F1BBBB] hover:bg-[#E394A7] text-[#2F3559] rounded-full shadow-md transition-transform active:scale-95"
+                      >
+                        <Pause size={24} />
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handlePlayStory(selectedStory)}
+                        className="p-4 bg-white text-[#2F3559] hover:bg-[#E6D8CB] rounded-full shadow-md transition-transform active:scale-95"
+                      >
+                        <Play size={24} className="ml-1" />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => {
+                        window.speechSynthesis.cancel();
+                        speak(selectedStory.content);
+                        setIsPlayingStory(true);
+                      }}
+                      className="p-3 bg-white/10 hover:bg-white/20 rounded-full"
+                      title="Reiniciar lectura"
+                    >
+                      <RotateCcw size={18} />
+                    </button>
+                  </div>
+
+                  <p className="text-xs opacity-75 italic text-center sm:text-right">
+                    Utilizamos la voz nativa de accesibilidad de tu dispositivo para leer la historia con naturalidad.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Crear un Cuento con Inteligencia Artificial (Gemini API) */}
+            <div className={`p-6 rounded-3xl shadow-lg border ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+            }`}>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-2xl font-black flex items-center gap-2 text-[#9A5071]">
+                    <Sparkles className="animate-spin" style={{ animationDuration: '4s' }} />
+                    <span>Creador de Cuentos Inteligente</span>
+                  </h3>
+                  <p className="text-sm opacity-80 mt-1">
+                    Ingresa un tema (ejemplo: "un viaje a la luna", "amigos bajo la lluvia") y la Inteligencia Artificial creará una historia mágica, rica en olores, sonidos y texturas.
                   </p>
                 </div>
               </div>
 
-              {/* Accesibilidad rápida (Header) */}
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => {
-                    const newVal = !voiceOverEnabled;
-                    setVoiceOverEnabled(newVal);
-                    if (newVal) {
-                      setTimeout(() => speak("Voz activada."), 200);
-                    } else {
-                      window.speechSynthesis.cancel();
-                    }
-                  }}
-                  className={`p-2 rounded-full transition-all duration-200 ${
-                    voiceOverEnabled ? 'bg-[#9A5071] text-white shadow-sm' : 'bg-[#E6D8CB]/10 text-[#E6D8CB] border border-[#E6D8CB]/20'
-                  }`}
-                  title="Activar/Silenciar voz"
-                  onMouseEnter={() => speak("Alternar voz")}
-                >
-                  {voiceOverEnabled ? <Icon name="Volume2" size={18} /> : <Icon name="VolumeX" size={18} />}
-                </button>
-
-                {/* Selector de velocidad */}
-                {voiceOverEnabled && (
-                  <button 
-                    onClick={() => {
-                      const rates = [1, 1.3, 0.8];
-                      const nextIndex = (rates.indexOf(speechRate) + 1) % rates.length;
-                      const nextRate = rates[nextIndex];
-                      setSpeechRate(nextRate);
-                      speak(nextRate === 1 ? "Velocidad normal" : nextRate === 1.3 ? "Velocidad rápida" : "Velocidad lenta");
-                    }}
-                    className="text-[10px] md:text-xs font-bold px-2.5 py-2 bg-black/15 text-[#E6D8CB] rounded-full hover:bg-black/30"
-                  >
-                    {speechRate === 1 ? 'Voz: Norm' : speechRate === 1.3 ? 'Voz: Rápida' : 'Voz: Lenta'}
-                  </button>
-                )}
-
-                <button 
-                  onClick={() => {
-                    const nextVal = !highContrast;
-                    setHighContrast(nextVal);
-                    speak(nextVal ? "Contraste alto." : "Contraste normal.");
-                  }}
-                  className={`p-2 rounded-full transition-all duration-200 ${
-                    highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071]/20 text-[#E6D8CB]'
-                  }`}
-                  onMouseEnter={() => speak("Cambiar contraste")}
-                >
-                  {highContrast ? <Icon name="Eye" size={18} /> : <Icon name="EyeOff" size={18} />}
-                </button>
-              </div>
-
-            </div>
-          </header>
-
-          {/* MENÚ DE ESCRITORIO (Solo visible en Laptop) */}
-          <nav className={`hidden md:block sticky top-0 z-10 shadow-sm ${
-            highContrast ? 'bg-zinc-800 text-yellow-300 border-b border-yellow-300' : 'bg-[#9A5071] text-[#E6D8CB]'
-          }`}>
-            <div className="max-w-6xl mx-auto px-4 flex justify-around">
-              {menuItems.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    speak(`Sección ${tab.label}`);
-                  }}
-                  onMouseEnter={() => speak(tab.label)}
-                  className={`flex items-center gap-2 py-3 px-6 text-sm font-bold border-b-4 transition-all duration-200 ${
-                    activeTab === tab.id 
-                      ? (highContrast ? 'border-yellow-300 bg-black text-yellow-300' : 'border-[#F1BBBB] bg-[#2F3559] text-[#E6D8CB]')
-                      : 'border-transparent hover:bg-black/10'
-                  }`}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          {/* CONTENIDO PRINCIPAL - LIMITADO PARA EVITAR PANTALLAS LARGAS */}
-          <main className="flex-grow max-w-5xl mx-auto w-full px-3 py-4 md:py-6 overflow-y-auto">
-            {activeTab === 'home' && (
-              <HomeScreen setActiveTab={setActiveTab} speak={speak} highContrast={highContrast} />
-            )}
-            
-            {activeTab === 'braille' && (
-              <BrailleScreen speak={speak} highContrast={highContrast} />
-            )}
-            
-            {activeTab === 'cuentos' && (
-              <StoriesScreen 
-                speak={speak} 
-                stories={stories} 
-                setStories={setStories} 
-                highContrast={highContrast} 
-              />
-            )}
-          </main>
-
-          {/* MENÚ MÓVIL FIJO (Estilo App Nativa) */}
-          <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-30 border-t flex items-center justify-around py-1 px-2 shadow-lg backdrop-blur-md ${
-            highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-[#2F3559] text-[#E6D8CB] border-[#9A5071]/20'
-          }`}>
-            {menuItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  speak(item.label);
-                }}
-                className={`flex flex-col items-center justify-center p-2 rounded-xl w-16 transition-all ${
-                  activeTab === item.id 
-                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white')
-                    : 'opacity-70'
-                }`}
-              >
-                <div className="mb-0.5">{item.icon}</div>
-                <span className="text-[10px] font-bold leading-none">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-
-        </div>
-      );
-    }
-
-    // ==========================================
-    // 1. PANTALLA: INICIO (HomeScreen)
-    // ==========================================
-    function HomeScreen({ setActiveTab, speak, highContrast }) {
-      return (
-        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
-          
-          <div className={`p-5 md:p-6 rounded-2xl shadow-md border text-center transition-all ${
-            highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-[#E394A7]/20 text-[#2F3559]'
-          }`}>
-            <div className="inline-flex p-2.5 bg-[#E6D8CB]/50 rounded-full mb-3">
-              <span className="text-3xl md:text-4xl" role="img" aria-label="Perro Labrador">🐕</span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-extrabold mb-2">¡Hola, te damos la bienvenida!</h2>
-            <p className="text-xs md:text-sm leading-relaxed mb-4 max-w-lg mx-auto opacity-90">
-              Explora de forma táctil el alfabeto Braille o escucha cuentos interactivos diseñados con ricas descripciones sensoriales.
-            </p>
-            
-            <button
-              onClick={() => speak("Braille Voz es un espacio seguro para aprender tocando y escuchando.")}
-              className={`px-6 py-2.5 rounded-full font-bold text-sm inline-flex items-center gap-2 transition-transform hover:scale-102 ${
-                highContrast ? 'bg-yellow-300 text-black' : 'bg-[#2F3559] text-[#E6D8CB] hover:bg-[#2F3559]/90'
-              }`}
-            >
-              <Icon name="Volume2" size={16} />
-              <span>Escuchar Introducción</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {[
-              { id: 'braille', label: 'Abecedario', desc: 'Aprende y traduce letras.', icon: <Icon name="BookOpen" size={20} />, bg: 'bg-[#F1BBBB]/20' },
-              { id: 'cuentos', label: 'Cuentos', desc: 'Historias llenas de texturas y olores.', icon: <Icon name="Sparkles" size={20} />, bg: 'bg-[#E394A7]/20' }
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => { setActiveTab(item.id); speak(`Sección ${item.label}`); }}
-                className={`p-4 rounded-xl border flex items-center gap-3 text-left transition-transform hover:scale-[1.01] ${
-                  highContrast ? 'bg-black border-yellow-300' : 'bg-white hover:border-[#9A5071]/50'
-                }`}
-              >
-                <div className={`p-2.5 rounded-lg ${highContrast ? 'bg-yellow-300 text-black' : `${item.bg} text-[#2F3559]`}`}>
-                  {item.icon}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold block">{item.label}</h3>
-                  <p className="text-[10px] opacity-70 block">{item.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-
-        </div>
-      );
-    }
-
-    // ==========================================
-    // 2. PANTALLA: ABECEDARIO (BrailleScreen)
-    // ==========================================
-    function BrailleScreen({ speak, highContrast }) {
-      const [subTab, setSubTab] = useState('explorar');
-      const [customCell, setCustomCell] = useState([]);
-      const [searchText, setSearchText] = useState('');
-
-      const toggleDot = (dot) => {
-        let newCell = customCell.includes(dot) 
-          ? customCell.filter(d => d !== dot)
-          : [...customCell, dot].sort();
-        
-        setCustomCell(newCell);
-
-        const matched = Object.keys(BRAILLE_ALPHABET).find(letter => {
-          const dots = BRAILLE_ALPHABET[letter];
-          return dots.length === newCell.length && dots.every(v => newCell.includes(v));
-        });
-
-        if (matched) {
-          playTone(440, 0.15);
-          speak(`Formaste la letra ${matched.toUpperCase()}`);
-        } else {
-          playTone(330, 0.1);
-        }
-      };
-
-      const getCustomLetter = () => {
-        return Object.keys(BRAILLE_ALPHABET).find(letter => {
-          const dots = BRAILLE_ALPHABET[letter];
-          return dots.length === customCell.length && dots.every(v => customCell.includes(v));
-        }) || null;
-      };
-
-      return (
-        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
-          
-          <div className="flex bg-black/5 p-1 rounded-xl">
-            {[
-              { id: 'explorar', label: 'Explorar' },
-              { id: 'constructor', label: 'Constructor' },
-              { id: 'traductor', label: 'Traductor' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => { setSubTab(tab.id); speak(`Herramienta ${tab.label}`); }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  subTab === tab.id 
-                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
-                    : 'opacity-75'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {subTab === 'explorar' && (
-            <div className={`p-4 rounded-xl border ${
-              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
-            }`}>
-              <p className="text-[11px] mb-3 opacity-85 text-center">Pulsa cualquier letra para escucharla e identificar sus puntos.</p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-                {Object.entries(BRAILLE_ALPHABET).map(([letter, dots]) => (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={aiStoryTopic}
+                    onChange={(e) => setAiStoryTopic(e.target.value)}
+                    placeholder="¿Sobre qué te gustaría el cuento sensorial?"
+                    className="flex-1 p-4 rounded-xl border border-gray-300 focus:ring-2 focus:ring-[#9A5071] text-base bg-[#E6D8CB]/20 text-[#2F3559]"
+                    disabled={isGeneratingStory}
+                  />
                   <button
-                    key={letter}
-                    onClick={() => {
-                      playTone(320 + (letter.charCodeAt(0) * 2), 0.15);
-                      speak(`Letra ${letter.toUpperCase()}. Puntos: ${dots.join(', ')}`);
-                    }}
-                    className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all ${
-                      highContrast ? 'bg-zinc-955 border-yellow-300/30' : 'bg-gray-50/70 border-gray-100 hover:border-[#9A5071]'
+                    onClick={generateStoryWithAI}
+                    disabled={isGeneratingStory}
+                    className={`px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                      isGeneratingStory 
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white hover:bg-[#9A5071]/90 shadow-md')
                     }`}
                   >
-                    <span className="text-base font-extrabold mb-1">{letter.toUpperCase()}</span>
-                    <div className="grid grid-cols-2 gap-0.5 bg-[#E6D8CB]/20 p-1 rounded">
-                      {[1, 4, 2, 5, 3, 6].map(d => (
-                        <div 
-                          key={d} 
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            dots.includes(d) ? (highContrast ? 'bg-yellow-300' : 'bg-[#9A5071]') : 'bg-gray-300/80'
-                          }`} 
-                        />
-                      ))}
-                    </div>
+                    {isGeneratingStory ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Creando magia...
+                      </span>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        <span>Generar Cuento</span>
+                      </>
+                    )}
                   </button>
+                </div>
+
+                {aiError && (
+                  <div className="p-3 bg-red-100 text-red-700 rounded-lg flex items-center gap-2 text-sm">
+                    <AlertCircle size={16} />
+                    <span>{aiError}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Biblioteca de Cuentos */}
+            <div className="space-y-4">
+              <h4 className="text-xl font-bold flex items-center gap-2">
+                <span>Biblioteca de Cuentos Disponibles</span>
+                <span className="bg-[#9A5071] text-white text-xs px-2.5 py-0.5 rounded-full">{stories.length}</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {stories.map(story => (
+                  <div 
+                    key={story.id}
+                    className={`p-6 rounded-2xl shadow-md border hover:shadow-lg transition-all flex flex-col justify-between ${
+                      highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-[#E394A7]/20'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[10px] font-extrabold text-[#9A5071] tracking-widest uppercase block mb-1">
+                        {story.sensoryFocus}
+                      </span>
+                      <h5 className="text-lg font-bold mb-2 text-[#2F3559]">{story.title}</h5>
+                      <p className="text-xs opacity-85 leading-relaxed line-clamp-3">{story.summary}</p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+                      <button 
+                        onClick={() => handlePlayStory(story)}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 bg-[#2F3559] text-white hover:bg-[#2F3559]/90`}
+                        onMouseEnter={() => speak(`Escuchar cuento: ${story.title}`)}
+                      >
+                        <Play size={12} />
+                        <span>Escuchar cuento</span>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedStory(story);
+                          speak(`Visualizando texto de: ${story.title}`);
+                        }}
+                        className="text-xs font-bold text-[#9A5071] hover:underline"
+                        onMouseEnter={() => speak(`Leer texto del cuento`)}
+                      >
+                        Leer texto
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {subTab === 'constructor' && (
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4 ${
-              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* TAB 4: JUEGOS DE SONIDO E INTERACTIVOS */}
+        {/* ======================================= */}
+        {activeTab === 'juegos' && (
+          <div className="space-y-8 animate-fadeIn">
+            
+            {/* Header de la Zona de Juegos */}
+            <div className={`p-6 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
+              highContrast ? 'bg-black border-yellow-300' : 'bg-[#9A5071]/10 border-[#9A5071]/30'
             }`}>
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="text-sm font-extrabold flex items-center gap-1.5 justify-center sm:justify-start">
-                  <Icon name="Sparkles" size={16} className="text-[#9A5071]" /> Constructor Braille
-                </h3>
-                <p className="text-[11px] opacity-80 mt-1 max-w-sm">Pulsa los puntos circulares y descubre qué letra formas.</p>
-                
-                <div className="mt-4 flex items-center justify-center sm:justify-start gap-2">
-                  <span className="text-xs uppercase font-extrabold opacity-75">Letra encontrada:</span>
-                  <span className="text-2xl font-black text-[#9A5071] bg-[#E6D8CB]/30 px-3 py-1 rounded-lg">
-                    {getCustomLetter() ? getCustomLetter().toUpperCase() : '?'}
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => { setCustomCell([]); speak("Limpiado"); }}
-                  className="mt-4 px-4 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider block mx-auto sm:mx-0"
-                >
-                  Reiniciar Puntos
-                </button>
+              <div>
+                <h3 className="text-2xl font-black text-[#9A5071]">Zona de Juegos de Oído</h3>
+                <p className="text-sm opacity-85 mt-1">
+                  Ejercita tu mente con desafíos interactivos especialmente diseñados para agudizar el sentido del oído y el aprendizaje del Braille.
+                </p>
               </div>
-
-              <div className="p-3 bg-[#E6D8CB]/20 rounded-xl">
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 4, 2, 5, 3, 6].map(num => (
-                    <button
-                      key={num}
-                      onClick={() => toggleDot(num)}
-                      className={`w-12 h-12 rounded-full font-bold text-sm flex items-center justify-center transition-all shadow-sm ${
-                        customCell.includes(num)
-                          ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white')
-                          : 'bg-white border border-gray-300'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
+              <div className="bg-white px-5 py-2 rounded-2xl shadow-sm border border-[#9A5071]/20 flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-500 uppercase">Puntuación:</span>
+                <span className="text-2xl font-black text-[#2F3559]">{gameScore} Puntos</span>
               </div>
             </div>
-          )}
 
-          {subTab === 'traductor' && (
-            <div className={`p-4 rounded-xl border space-y-3 ${
-              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10'
-            }`}>
-              <div className="flex items-center gap-1.5">
-                <Icon name="Search" size={16} className="text-[#9A5071]" />
-                <h3 className="text-sm font-extrabold">Traductor Instantáneo</h3>
-              </div>
+            {/* Grid con los Tres Juegos */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              <input 
-                type="text" 
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Escribe aquí..."
-                className={`w-full p-2.5 rounded-lg font-bold text-sm focus:outline-none focus:ring-1 ${
-                  highContrast 
-                    ? 'bg-zinc-900 border border-yellow-300 text-yellow-300 focus:ring-yellow-300' 
-                    : 'bg-[#E6D8CB]/20 border border-[#E394A7]/20 focus:ring-[#9A5071]'
-                }`}
-              />
+              {/* JUEGO 1: PRUEBA BRAILLE (QUIZ) */}
+              <div className={`p-6 rounded-3xl shadow-lg border flex flex-col justify-between ${
+                highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 bg-[#9A5071] text-white text-[10px] font-bold rounded-full">JUEGO 1</span>
+                    <h4 className="text-lg font-bold">¿Qué letra es?</h4>
+                  </div>
+                  <p className="text-xs opacity-75 mb-4">
+                    Observa la celda Braille de abajo y selecciona cuál letra del abecedario representa.
+                  </p>
 
-              {searchText && (
-                <div className="p-3 bg-[#E6D8CB]/10 rounded-lg max-h-[30vh] overflow-y-auto">
-                  <div className="flex flex-wrap gap-2">
-                    {searchText.toLowerCase().split('').map((char, index) => {
-                      const activeDots = BRAILLE_ALPHABET[char] || [];
-                      if (!BRAILLE_ALPHABET[char] && char !== ' ') return null;
-                      return (
-                        <div key={index} className="flex flex-col items-center p-2 bg-white rounded-lg border text-[10px] min-w-[50px] shadow-sm">
-                          <span className="font-bold mb-1 text-xs">{char === ' ' ? 'Esp' : char.toUpperCase()}</span>
-                          <div className="grid grid-cols-2 gap-0.5 bg-[#E6D8CB]/15 p-1 rounded">
-                            {[1, 4, 2, 5, 3, 6].map(dot => (
-                              <div 
-                                key={dot}
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  activeDots.includes(dot) ? 'bg-[#9A5071]' : 'bg-gray-300'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  {/* Celda a adivinar */}
+                  <div className="flex justify-center my-6">
+                    <div className="bg-[#E6D8CB]/30 p-6 rounded-2xl border border-gray-200 grid grid-cols-2 gap-x-6 gap-y-4 w-32 shadow-inner">
+                      {[1, 4, 2, 5, 3, 6].map(num => {
+                        const dots = BRAILLE_ALPHABET[quizLetter] || [];
+                        const isActive = dots.includes(num);
+                        return (
+                          <div 
+                            key={num}
+                            className={`w-8 h-8 rounded-full ${
+                              isActive 
+                                ? 'bg-[#9A5071] shadow-md scale-110' 
+                                : 'bg-gray-200'
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Opciones de respuesta */}
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    {quizOptions.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleQuizAnswer(opt)}
+                        onMouseEnter={() => speak(`Opción ${opt.toUpperCase()}`)}
+                        className={`py-3 rounded-xl font-bold text-lg transition-transform active:scale-95 border ${
+                          quizFeedback 
+                            ? opt === quizLetter 
+                              ? 'bg-green-100 text-green-800 border-green-400'
+                              : 'bg-red-50 text-red-500 border-red-200 opacity-60'
+                            : 'bg-[#E6D8CB]/30 text-[#2F3559] hover:bg-[#F1BBBB]/40 border-gray-200'
+                        }`}
+                        disabled={!!quizFeedback}
+                      >
+                        {opt.toUpperCase()}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
 
-        </div>
-      );
-    }
-
-    // ==========================================
-    // 3. PANTALLA: CUENTOS (StoriesScreen)
-    // ==========================================
-    function StoriesScreen({ speak, stories, setStories, highContrast }) {
-      const [subTab, setSubTab] = useState('biblioteca');
-      const [selectedStory, setSelectedStory] = useState(null);
-      const [isPlaying, setIsPlaying] = useState(false);
-      const [aiTopic, setAiTopic] = useState('');
-      const [isGenerating, setIsGenerating] = useState(false);
-      const [errorMsg, setErrorMsg] = useState('');
-
-      const playStory = (story) => {
-        setSelectedStory(story);
-        setIsPlaying(true);
-        speak(`Narración de: ${story.title}. ... ${story.content}`);
-      };
-
-      const pauseStory = () => {
-        window.speechSynthesis.pause();
-        setIsPlaying(false);
-        speak("Pausado");
-      };
-
-      const resumeStory = () => {
-        window.speechSynthesis.resume();
-        setIsPlaying(true);
-      };
-
-      const stopStory = () => {
-        window.speechSynthesis.cancel();
-        setIsPlaying(false);
-        setSelectedStory(null);
-      };
-
-      const generateAIStory = async () => {
-        if (!aiTopic.trim()) {
-          speak("Indica un tema para el cuento.");
-          return;
-        }
-
-        setIsGenerating(true);
-        setErrorMsg('');
-        speak("Creando tu cuento personalizado con inteligencia artificial.");
-
-        const apiKey = ""; 
-        const systemPrompt = "Eres un escritor especialista en literatura infantil adaptada para niños con discapacidad visual. Generas cuentos muy sensoriales y cortos de 3 párrafos cortos en español. Concéntrate en describir sonidos, olores y texturas. Devuelve únicamente el cuento.";
-        const userPrompt = `Escribe un cuento infantil muy descriptivo y sensorial sobre: "${aiTopic}". El protagonista debe ser un perrito guía Golden Retriever llamado "Braillito".`;
-
-        try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: userPrompt }] }],
-                systemInstruction: { parts: [{ text: systemPrompt }] }
-              })
-            }
-          );
-
-          if (!response.ok) throw new Error("Error de conexión.");
-          const data = await response.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          if (!text) throw new Error("Respuesta de IA vacía.");
-
-          const newStory = {
-            id: Date.now(),
-            title: `Cuento: ${aiTopic.substring(0, 15)}`,
-            summary: `Creado por IA sobre ${aiTopic}.`,
-            content: text,
-            sensoryFocus: "Sensorial (IA)"
-          };
-
-          setStories(prev => [newStory, ...prev]);
-          setSelectedStory(newStory);
-          setIsGenerating(false);
-          setAiTopic('');
-          setSubTab('biblioteca');
-          speak(`¡Tu cuento ha sido creado! Se titula: ${newStory.title}. ¿Quieres escucharlo?`);
-        } catch (err) {
-          setIsGenerating(false);
-          setErrorMsg('No pudimos conectar con el creador en este momento.');
-          speak("Ocurrió un error al conectar.");
-        }
-      };
-
-      return (
-        <div className="space-y-4 animate-fadeIn max-w-3xl mx-auto">
-          
-          {!selectedStory && (
-            <div className="flex bg-black/5 p-1 rounded-xl">
-              <button
-                onClick={() => { setSubTab('biblioteca'); speak("Biblioteca de cuentos"); }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                  subTab === 'biblioteca' 
-                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
-                    : 'opacity-75'
-                }`}
-              >
-                <Icon name="List" size={14} /> Biblioteca
-              </button>
-              <button
-                onClick={() => { setSubTab('creador'); speak("Creador inteligente de cuentos"); }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                  subTab === 'creador' 
-                    ? (highContrast ? 'bg-yellow-300 text-black' : 'bg-white shadow-sm text-[#9A5071]') 
-                    : 'opacity-75'
-                }`}
-              >
-                <Icon name="Plus" size={14} /> Creador IA
-              </button>
-            </div>
-          )}
-
-          {selectedStory ? (
-            <div className={`p-4 rounded-xl border space-y-4 ${
-              highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10 shadow-md'
-            }`}>
-              <div className="flex items-center justify-between border-b pb-2">
-                <div>
-                  <span className="text-[10px] font-extrabold uppercase text-[#9A5071]">{selectedStory.sensoryFocus}</span>
-                  <h3 className="text-lg font-black">{selectedStory.title}</h3>
-                </div>
-                <button 
-                  onClick={stopStory}
-                  className="p-1.5 border rounded-full hover:bg-gray-100"
-                >
-                  <Icon name="ArrowLeft" size={16} />
-                </button>
-              </div>
-
-              <div className="max-h-[35vh] overflow-y-auto pr-1 text-sm md:text-base leading-relaxed whitespace-pre-line bg-[#E6D8CB]/10 p-3 rounded-lg border">
-                "{selectedStory.content}"
-              </div>
-
-              <div className="flex gap-2 justify-center">
-                {isPlaying ? (
-                  <button
-                    onClick={pauseStory}
-                    className="px-4 py-2 bg-[#9A5071] text-white text-xs rounded-full flex items-center gap-1.5 font-bold"
-                  >
-                    <Icon name="Pause" size={14} /> Pausar
-                  </button>
-                ) : (
-                  <button
-                    onClick={resumeStory}
-                    className="px-4 py-2 bg-[#2F3559] text-white text-xs rounded-full flex items-center gap-1.5 font-bold"
-                  >
-                    <Icon name="Play" size={14} /> Reanudar
-                  </button>
-                )}
-                <button
-                  onClick={() => playStory(selectedStory)}
-                  className="px-4 py-2 border text-xs rounded-full flex items-center gap-1.5 font-bold"
-                >
-                  <Icon name="RotateCcw" size={14} /> Reiniciar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {subTab === 'biblioteca' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
-                  {stories.map(story => (
-                    <div
-                      key={story.id}
-                      className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                        highContrast ? 'bg-zinc-950 border-yellow-300' : 'bg-white border-gray-100'
-                      }`}
+                {/* Siguiente pregunta */}
+                {quizFeedback && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className={`text-xs font-bold text-center mb-3 ${quizFeedback.success ? 'text-green-600' : 'text-red-500'}`}>
+                      {quizFeedback.message}
+                    </p>
+                    <button
+                      onClick={generateNewQuizQuestion}
+                      className="w-full py-2 bg-[#2F3559] text-[#E6D8CB] font-bold rounded-xl text-xs hover:bg-[#2F3559]/95 transition-colors"
                     >
-                      <div>
-                        <span className="text-[9px] font-bold text-[#9A5071] uppercase bg-[#E6D8CB]/30 px-1.5 py-0.5 rounded">
-                          {story.sensoryFocus}
-                        </span>
-                        <h4 className="text-sm font-extrabold mt-2 mb-1">{story.title}</h4>
-                        <p className="text-[11px] opacity-80 line-clamp-2 leading-relaxed mb-3">{story.summary}</p>
-                      </div>
+                      Siguiente Letra
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* JUEGO 2: MEMORAMA DE SONIDOS (MEMORIA) */}
+              <div className={`p-6 rounded-3xl shadow-lg border flex flex-col justify-between ${
+                highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 bg-[#9A5071] text-white text-[10px] font-bold rounded-full">JUEGO 2</span>
+                    <h4 className="text-lg font-bold">Memorama Musical</h4>
+                  </div>
+                  <p className="text-xs opacity-75 mb-4">
+                    Encuentra las parejas de sonidos musicales tocando las cartas. ¡Un reto auditivo fantástico!
+                  </p>
+
+                  {soundCards.length === 0 ? (
+                    <div className="text-center py-12">
                       <button
-                        onClick={() => playStory(story)}
-                        className="w-full py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 bg-[#2F3559] text-white"
+                        onClick={startSoundMemoryGame}
+                        className="px-6 py-3 bg-[#9A5071] text-white font-bold rounded-full text-sm hover:scale-105 transition-transform"
                       >
-                        <Icon name="Play" size={12} /> Escuchar
+                        Iniciar Juego
                       </button>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2 my-4">
+                      {soundCards.map((card, idx) => {
+                        const isSelected = selectedCards.includes(idx);
+                        const isMatched = matchedCards.includes(idx);
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleCardClick(idx)}
+                            onMouseEnter={() => speak(`Tarjeta número ${idx + 1}`)}
+                            className={`aspect-square rounded-xl flex flex-col items-center justify-center font-bold text-sm transition-all duration-300 ${
+                              isMatched 
+                                ? 'bg-green-100 text-green-700 border-green-300 scale-95 opacity-50'
+                                : isSelected 
+                                  ? 'bg-[#9A5071] text-white border-transparent'
+                                  : 'bg-[#2F3559] text-[#E6D8CB] hover:bg-[#2F3559]/90'
+                            }`}
+                            disabled={isCheckingCards || isMatched}
+                          >
+                            {isMatched ? "✓" : isSelected ? "♫" : `${idx + 1}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {subTab === 'creador' && (
-                <div className={`p-4 rounded-xl border space-y-3 ${
-                  highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/10 shadow-sm'
-                }`}>
-                  <h3 className="text-sm font-extrabold">Crea una historia nueva</h3>
-                  <p className="text-[11px] opacity-80">Escribe sobre qué quieres el cuento (ej: "un gato espacial", "un río tibio").</p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input 
-                      type="text"
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      placeholder="Escribe una idea..."
-                      className={`flex-1 p-2.5 rounded-lg text-xs focus:outline-none focus:ring-1 ${
-                        highContrast 
-                          ? 'bg-zinc-900 border border-yellow-300 text-yellow-300' 
-                          : 'bg-[#E6D8CB]/20 border border-[#E394A7]/20 text-[#2F3559]'
-                      }`}
-                    />
-                    <button
-                      onClick={generateAIStory}
-                      disabled={isGenerating}
-                      className={`px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-wide transition-all ${
-                        highContrast ? 'bg-yellow-300 text-black' : 'bg-[#9A5071] text-white hover:bg-[#9A5071]/90'
-                      }`}
+                {soundCards.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center text-xs">
+                    <span>Parejas: {matchedCards.length / 2} de 4</span>
+                    <button 
+                      onClick={startSoundMemoryGame} 
+                      className="text-[#9A5071] font-bold hover:underline"
                     >
-                      {isGenerating ? "Creando...." : "Generar"}
+                      Reiniciar
                     </button>
                   </div>
-                  {errorMsg && <p className="text-red-500 text-[10px] font-bold">{errorMsg}</p>}
+                )}
+              </div>
+
+              {/* JUEGO 3: SECUENCIA AUDITIVA (SIMON SAYS) */}
+              <div className={`p-6 rounded-3xl shadow-lg border flex flex-col justify-between ${
+                highContrast ? 'bg-black border-yellow-300' : 'bg-white border-[#E394A7]/30'
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-0.5 bg-[#9A5071] text-white text-[10px] font-bold rounded-full">JUEGO 3</span>
+                    <h4 className="text-lg font-bold">Secuencia Auditiva</h4>
+                  </div>
+                  <p className="text-xs opacity-75 mb-4">
+                    Escucha el orden en que se reproducen los sonidos y repítelo utilizando los botones grandes.
+                  </p>
+
+                  {simonSequence.length === 0 ? (
+                    <div className="text-center py-12">
+                      <button
+                        onClick={startSimonGame}
+                        className="px-6 py-3 bg-[#9A5071] text-white font-bold rounded-full text-sm hover:scale-105 transition-transform"
+                      >
+                        Iniciar Desafío
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 my-6">
+                      <p className="text-xs font-bold text-center text-[#9A5071] animate-pulse">
+                        {isSimonPlaying ? "¡Escuchando secuencia!" : "¡Tu turno de repetir!"}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        {[1, 2, 3].map((id) => {
+                          const labels = { 1: "Agudo", 2: "Medio", 3: "Grave" };
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => handleSimonInput(id)}
+                              onMouseEnter={() => speak(`Botón ${labels[id]}`)}
+                              className={`py-8 rounded-2xl flex flex-col items-center justify-center font-bold text-xs transition-transform active:scale-95 text-white ${
+                                id === 1 ? 'bg-[#9A5071] hover:bg-[#9A5071]/90' :
+                                id === 2 ? 'bg-[#E394A7] hover:bg-[#E394A7]/90' : 'bg-[#2F3559] hover:bg-[#2F3559]/90'
+                              }`}
+                              disabled={isSimonPlaying}
+                            >
+                              <Volume2 size={20} className="mb-1" />
+                              {labels[id]}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="text-center">
+                        <span className="text-xs font-bold opacity-75">Nivel actual: {simonSequence.length} sonidos</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          )}
 
+                {simonSequence.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end text-xs">
+                    <button 
+                      onClick={() => {
+                        setSimonSequence([]);
+                        setUserSequence([]);
+                        speak("Juego cancelado");
+                      }} 
+                      className="text-gray-500 font-bold hover:underline"
+                    >
+                      Terminar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      </main>
+
+      {/* PIE DE PÁGINA */}
+      <footer className={`mt-16 py-8 border-t text-center ${
+        highContrast ? 'bg-zinc-900 border-yellow-300 text-yellow-300' : 'bg-[#2F3559]/5 text-[#2F3559] border-gray-200'
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 Braille Voz. Creado con amor para la estimulación de los sentidos y la educación inclusiva.</p>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => speak("Desarrollado para personas con debilidad visual con lector integrado y sonidos interactivos.")}
+              className="hover:underline"
+            >
+              Accesibilidad
+            </button>
+            <button 
+              onClick={() => speak("Licencia educativa abierta.")}
+              className="hover:underline"
+            >
+              Términos de uso
+            </button>
+          </div>
         </div>
-      );
-    }
+      </footer>
 
-    // Renderizar la aplicación en el DOM
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+    </div>
+  );
+}
