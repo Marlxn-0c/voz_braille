@@ -82,6 +82,34 @@
         summary: "Una aventura a la orilla del océano sintiendo la arena tibia, la brisa salada y el vaivén de las olas.",
         content: "El sonido del mar era un susurro constante que iba y venía: 'Shhh... shhh...'. Cada ola que llegaba a la orilla dejaba una espuma fresca que hacía cosquillas en los tobillos de Tomás. La arena bajo sus pies estaba tibia por el sol del mediodía y se escurría suavemente entre sus dedos como agua seca.\n\nTomás se agachó y enterró las manos. Encontró algo pequeño, liso y con forma de estrella. Tenía una textura ligeramente rugosa en los bordes pero un centro suave.\n\nAl acercarla a su oído, no solo escuchó el viento marino, sino que sintió la brisa salada acariciándole la cara. El océano entero estaba hablándole con su voz de espuma y caricias de arena.",
         sensoryFocus: "Tacto y Sonido"
+      },
+      {
+        id: 4,
+        title: "El Panadero del Alba",
+        summary: "Descubre la magia de la panadería con el calor del horno y el aroma a canela y masa fresca.",
+        content: "Muy temprano por la mañana, cuando la brisa aún es fresca y silenciosa, Andrés acompaña a su abuelo a la panadería. Al cruzar la puerta, un choque de aire tibio y dulce lo abraza de inmediato. El lugar huele a vainilla, canela y mantequilla derretida.\n\nAndrés mete las manos en un tazón lleno de harina: se siente esponjosa, suave y liviana como nieve tibia. Luego ayuda a amasar. La masa es elástica, suave y cobra vida bajo la presión rítmica de sus palmas.\n\nCuando el pan sale del horno, el chasquido de la corteza crujiente suena como pequeños aplausos. Al darle un mordisco, el calor reconfortante llena todo su ser.",
+        sensoryFocus: "Olfato, Tacto y Gusto"
+      },
+      {
+        id: 5,
+        title: "La Sinfonía de la Lluvia",
+        summary: "Un viaje sonoro y táctil escuchando el repiqueteo de las gotas de agua y sintiendo la brisa húmeda.",
+        content: "Valentina se sentó cerca de la ventana abierta cuando comenzó a llover. Las primeras gotas cayeron sobre las hojas del jardín con un golpeteo seco y rápido: 'Tap, tap, tap'. Poco a poco, el ritmo se volvió más denso y continuo, creando una melodía envolvente.\n\nValentina sacó la mano por la ventana. Sintió el impacto diminuto y fresco de las gotas contra la palma de su mano, seguido por el recorrido suave del agua deslizándose entre sus dedos. El aire se llenó de un perfume único y limpio: el aroma a petricor, la tierra mojada despertando.\n\nCerró los ojos y respiró hondo, escuchando cómo el tejado de tejas de barro resonaba como un gran tambor afinado por la naturaleza.",
+        sensoryFocus: "Oído y Tacto"
+      },
+      {
+        id: 6,
+        title: "El Abrazo de la Lana Mágica",
+        summary: "La abuela Elena le enseña a Lucas a tejer recuerdos suaves y cálidos.",
+        content: "Lucas adora pasar las tardes de invierno junto a la abuela Elena. Ella le pasa una bola de lana suave y esponjosa. Al deslizar la lana por entre sus dedos, Lucas siente pequeñas ondas y texturas afelpadas que le transmiten una calidez inmediata.\n\nMientras la abuela teje, las agujas de madera chocan entre sí con un 'clic, clic, clic' rítmico y pacífico, como el tic-tac de un reloj cariñoso. La manta que crece sobre sus piernas es pesada, abrigada y huele a jabón de lavanda.\n\nCada punto tejía no solo hilo, sino también historias de abrazos y tardes felices compartidas en familia.",
+        sensoryFocus: "Tacto y Sonido"
+      },
+      {
+        id: 7,
+        title: "El Viaje del Viento de Otoño",
+        summary: "Acompaña a Camilo a seguir las crujientes alfombras de hojas y la brisa juguetona.",
+        content: "Otoño ha llegado al parque y Camilo lo sabe antes que nadie. Con cada paso que da, escucha un crujido seco y crujiente bajo sus botas: 'Craj, craj, craj'. Es la alfombra de hojas secas que cubre todo el suelo.\n\nCamilo se agacha y junta un puñado de hojas. Siente sus bordes quebradizos, sus vetas marcadas como pequeñas redes e hilos, e imagina sus colores tostados. Lanza las hojas al aire y un soplido de viento helado y juguetón se las lleva, haciéndolas revolotear a su alrededor.\n\nEl viento le acaricia las mejillas y le despeina el cabello, invitándolo a seguir caminando por el parque cantarín.",
+        sensoryFocus: "Oído y Tacto"
       }
     ];
 
@@ -356,11 +384,11 @@
             </div>
             <h2 className="text-2xl md:text-3xl font-black mb-3">¡Bienvenido a Braille Voz!</h2>
             <p className="text-xs md:text-sm leading-relaxed mb-6 max-w-md mx-auto opacity-90 font-medium">
-              Aprende el alfabeto Braille jugando y explora cuentos narrados con inteligencia artificial, diseñados para estimular el oído, el tacto y la imaginación.
+              Aprende el alfabeto Braille jugando y explora nuestra biblioteca de cuentos sensoriales narrados, diseñados para estimular el oído, el tacto y la imaginación.
             </p>
             
             <button
-              onClick={() => speak("Braille Voz es un entorno accesible interactivo para niños y adultos. Puedes aprender el alfabeto en código Braille o crear cuentos sensoriales con IA.")}
+              onClick={() => speak("Braille Voz es un entorno accesible interactivo para niños y adultos. Puedes aprender el alfabeto en código Braille o disfrutar de cuentos narrados llenos de detalles sensoriales.")}
               className={`px-6 py-3 rounded-full font-bold text-xs md:text-sm inline-flex items-center gap-2 shadow-md hover:scale-105 transition-all ${
                 highContrast ? 'bg-yellow-300 text-black hover:bg-yellow-400' : 'bg-[#2F3559] text-[#E6D8CB] hover:bg-[#2F3559]/90'
               }`}
@@ -373,7 +401,7 @@
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { id: 'braille', label: 'Abecedario Braille', desc: 'Explora puntos, traduce textos y construye letras.', icon: <Icon name="BookOpen" size={22} />, bg: 'bg-[#F1BBBB]/30' },
-              { id: 'cuentos', label: 'Cuentos con IA', desc: 'Escucha cuentos clásicos o crea nuevos con Inteligencia Artificial.', icon: <Icon name="Sparkles" size={22} />, bg: 'bg-[#E394A7]/30' }
+              { id: 'cuentos', label: 'Biblioteca de Cuentos', desc: 'Escucha cuentos llenos de experiencias táctiles y auditivas.', icon: <Icon name="Sparkles" size={22} />, bg: 'bg-[#E394A7]/30' }
             ].map(item => (
               <button
                 key={item.id}
@@ -587,12 +615,8 @@
     }
 
     function StoriesScreen({ speak, stories, setStories, highContrast }) {
-      const [subTab, setSubTab] = useState('biblioteca');
       const [selectedStory, setSelectedStory] = useState(null);
       const [isPlaying, setIsPlaying] = useState(false);
-      const [aiTopic, setAiTopic] = useState('');
-      const [isGenerating, setIsGenerating] = useState(false);
-      const [errorMsg, setErrorMsg] = useState('');
 
       const playStory = (story) => {
         setSelectedStory(story);
@@ -617,118 +641,9 @@
         setSelectedStory(null);
       };
 
-      const generateAIStory = async () => {
-        if (!aiTopic.trim()) {
-          speak("Ingresa una idea o tema para el cuento.");
-          return;
-        }
-
-        setIsGenerating(true);
-        setErrorMsg('');
-        speak("Generando tu cuento personalizado con inteligencia artificial. Por favor espera unos momentos.");
-
-        const apiKey = ""; // Canvas runtime environment key auto-insertion
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-
-        const systemPrompt = "Eres un escritor especialista en literatura infantil inclusiva adaptada para niños con discapacidad visual o ceguera. Creas historias inmersivas, cálidas y con gran riqueza en descripciones táctiles, auditivas y olfativas. Proporcionas respuestas estructuradas en formato JSON.";
-        const userPrompt = `Escribe un cuento infantil muy descriptivo y sensorial sobre: "${aiTopic}". El cuento debe incluir las aventuras de un perrito guía llamado "Braillito". Devuelve un objeto JSON con las siguientes propiedades: "title" (un título atractivo), "summary" (un resumen breve de 1 frase), "content" (el texto completo del cuento dividido en 3 párrafos descriptivos y poéticos), y "sensoryFocus" (los sentidos principales, por ejemplo "Tacto y Olfato").`;
-
-        const payload = {
-          contents: [{ parts: [{ text: userPrompt }] }],
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                title: { type: "STRING" },
-                summary: { type: "STRING" },
-                content: { type: "STRING" },
-                sensoryFocus: { type: "STRING" }
-              },
-              required: ["title", "summary", "content", "sensoryFocus"]
-            }
-          }
-        };
-
-        const fetchWithRetry = async (retries = 3, delay = 1000) => {
-          for (let i = 0; i < retries; i++) {
-            try {
-              const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-              });
-              if (response.ok) return await response.json();
-            } catch (e) {
-              if (i === retries - 1) throw e;
-            }
-            await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
-          }
-          throw new Error("No se pudo conectar con la API.");
-        };
-
-        try {
-          const data = await fetchWithRetry();
-          const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          if (!jsonText) throw new Error("Respuesta vacía del modelo.");
-
-          const parsed = JSON.parse(jsonText);
-
-          const newStory = {
-            id: Date.now(),
-            title: parsed.title || `Cuento: ${aiTopic}`,
-            summary: parsed.summary || `Historia creada sobre ${aiTopic}`,
-            content: parsed.content,
-            sensoryFocus: parsed.sensoryFocus || "Sensorial (IA)"
-          };
-
-          setStories(prev => [newStory, ...prev]);
-          setSelectedStory(newStory);
-          setIsGenerating(false);
-          setAiTopic('');
-          setSubTab('biblioteca');
-          speak(`¡Cuento creado exitosamente! Se titula: ${newStory.title}. Iniciando lectura.`);
-          playStory(newStory);
-        } catch (err) {
-          console.error("AI Generation error:", err);
-          setIsGenerating(false);
-          setErrorMsg('Ocurrió un error al generar el cuento. Inténtalo de nuevo.');
-          speak("No se pudo conectar con el creador de cuentos en este momento.");
-        }
-      };
-
       return (
         <div className="space-y-5 animate-fadeIn max-w-2xl mx-auto">
           
-          {!selectedStory && (
-            <div className={`flex p-1.5 rounded-2xl border ${
-              highContrast ? 'bg-zinc-900 border-yellow-300/40' : 'bg-black/5 border-black/5'
-            }`}>
-              <button
-                onClick={() => { setSubTab('biblioteca'); speak("Biblioteca de cuentos"); }}
-                className={`flex-1 py-2 text-xs md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all ${
-                  subTab === 'biblioteca' 
-                    ? (highContrast ? 'bg-yellow-300 text-black shadow-sm' : 'bg-white shadow-sm text-[#9A5071]') 
-                    : 'opacity-70 hover:opacity-100'
-                }`}
-              >
-                <Icon name="List" size={16} /> Biblioteca
-              </button>
-              <button
-                onClick={() => { setSubTab('creador'); speak("Creador inteligente de cuentos"); }}
-                className={`flex-1 py-2 text-xs md:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all ${
-                  subTab === 'creador' 
-                    ? (highContrast ? 'bg-yellow-300 text-black shadow-sm' : 'bg-white shadow-sm text-[#9A5071]') 
-                    : 'opacity-70 hover:opacity-100'
-                }`}
-              >
-                <Icon name="Plus" size={16} /> Crear con IA
-              </button>
-            </div>
-          )}
-
           {selectedStory ? (
             <div className={`p-6 rounded-3xl border shadow-lg space-y-5 ${
               highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-gray-200 text-[#2F3559]'
@@ -778,81 +693,38 @@
               </div>
             </div>
           ) : (
-            <>
-              {subTab === 'biblioteca' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[55vh] overflow-y-auto pr-1">
-                  {stories.map(story => (
-                    <div
-                      key={story.id}
-                      className={`p-4 rounded-2xl border flex flex-col justify-between shadow-sm hover:shadow-md transition-all ${
-                        highContrast ? 'bg-zinc-950 border-yellow-300' : 'bg-white border-gray-200'
-                      }`}
-                    >
-                      <div>
-                        <span className="text-[10px] font-extrabold text-[#9A5071] uppercase bg-[#E6D8CB]/40 px-2 py-0.5 rounded-md">
-                          {story.sensoryFocus}
-                        </span>
-                        <h4 className="text-base font-black mt-2 mb-1.5 leading-snug">{story.title}</h4>
-                        <p className="text-xs opacity-80 line-clamp-2 leading-relaxed mb-4">{story.summary}</p>
-                      </div>
-                      <button
-                        onClick={() => playStory(story)}
-                        className="w-full py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 bg-[#2F3559] text-white hover:bg-[#2F3559]/90 transition-colors shadow-sm"
-                      >
-                        <Icon name="Play" size={14} /> Escuchar Cuento
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-base font-black flex items-center gap-2">
+                  <Icon name="BookOpen" size={18} className="text-[#9A5071]" /> Biblioteca de Cuentos ({stories.length})
+                </h3>
+              </div>
 
-              {subTab === 'creador' && (
-                <div className={`p-6 rounded-3xl border shadow-md space-y-4 ${
-                  highContrast ? 'bg-black border-yellow-300 text-yellow-300' : 'bg-white border-gray-200'
-                }`}>
-                  <div className="space-y-1">
-                    <h3 className="text-base font-black flex items-center gap-2">
-                      <Icon name="Sparkles" size={18} className="text-[#9A5071]" /> Creador con Inteligencia Artificial
-                    </h3>
-                    <p className="text-xs opacity-85 leading-relaxed">
-                      Escribe un tema o elementos (ejemplo: "un río mágico y un bosque ruidoso", "el olor del mar y una tarde tibia").
-                    </p>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-                    <input 
-                      type="text"
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      placeholder="Escribe una idea para el cuento..."
-                      disabled={isGenerating}
-                      className={`flex-1 p-3 rounded-xl text-xs md:text-sm font-medium focus:outline-none focus:ring-2 ${
-                        highContrast 
-                          ? 'bg-zinc-900 border border-yellow-300 text-yellow-300 focus:ring-yellow-300' 
-                          : 'bg-[#E6D8CB]/30 border border-gray-300 focus:ring-[#9A5071] text-[#2F3559]'
-                      }`}
-                    />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                {stories.map(story => (
+                  <div
+                    key={story.id}
+                    className={`p-4 rounded-2xl border flex flex-col justify-between shadow-sm hover:shadow-md transition-all ${
+                      highContrast ? 'bg-zinc-950 border-yellow-300' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[10px] font-extrabold text-[#9A5071] uppercase bg-[#E6D8CB]/40 px-2 py-0.5 rounded-md">
+                        {story.sensoryFocus}
+                      </span>
+                      <h4 className="text-base font-black mt-2 mb-1.5 leading-snug">{story.title}</h4>
+                      <p className="text-xs opacity-80 line-clamp-2 leading-relaxed mb-4">{story.summary}</p>
+                    </div>
                     <button
-                      onClick={generateAIStory}
-                      disabled={isGenerating}
-                      className={`px-6 py-3 rounded-xl font-black text-xs md:text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md ${
-                        highContrast ? 'bg-yellow-300 text-black hover:bg-yellow-400' : 'bg-[#9A5071] text-white hover:bg-[#9A5071]/90'
-                      } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => playStory(story)}
+                      className="w-full py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 bg-[#2F3559] text-white hover:bg-[#2F3559]/90 transition-colors shadow-sm"
                     >
-                      {isGenerating ? (
-                        <>
-                          <span className="animate-spin text-sm">⏳</span>
-                          <span>Creando...</span>
-                        </>
-                      ) : (
-                        <span>Generar</span>
-                      )}
+                      <Icon name="Play" size={14} /> Escuchar Cuento
                     </button>
                   </div>
-                  {errorMsg && <p className="text-red-500 text-xs font-bold pt-1">{errorMsg}</p>}
-                </div>
-              )}
-            </>
+                ))}
+              </div>
+            </div>
           )}
 
         </div>
